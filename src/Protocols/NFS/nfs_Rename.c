@@ -107,35 +107,33 @@ int nfs_Rename(nfs_arg_t *parg,
   cache_inode_file_type_t parent_filetype;
   cache_inode_file_type_t new_parent_filetype;
   int rc = NFS_REQ_OK;
+  short to_exportid = 0;
+  short from_exportid = 0;
 
   if(isDebug(COMPONENT_NFSPROTO))
     {
-     char strto[LEN_FH_STR], strfrom[LEN_FH_STR];
+      char                  strto[LEN_FH_STR];
+      char                  strfrom[LEN_FH_STR];
+      struct display_buffer dspbuf_to = {sizeof(strto), strto, strto};
+      struct display_buffer dspbuf_from = {sizeof(strfrom), strfrom, strfrom};
 
       switch (preq->rq_vers)
         {
         case NFS_V2:
             str_entry_name = parg->arg_rename2.from.name;
             str_new_entry_name = parg->arg_rename2.to.name;
+            (void) display_fhandle2(&dspbuf_from, &(parg->arg_rename2.from.dir));
+            (void) display_fhandle2(&dspbuf_to, &(parg->arg_rename2.to.dir));
             break;
 
         case NFS_V3:
             str_entry_name = parg->arg_rename3.from.name;
             str_new_entry_name = parg->arg_rename3.to.name;
+            (void) display_fhandle3(&dspbuf_from, &(parg->arg_rename3.from.dir));
+            (void) display_fhandle3(&dspbuf_to, &(parg->arg_rename3.to.dir));
             break;
         }
 
-      nfs_FhandleToStr(preq->rq_vers,
-                       &(parg->arg_rename2.from.dir),
-                       &(parg->arg_rename3.from.dir),
-                       NULL,
-                       strfrom);
-
-      nfs_FhandleToStr(preq->rq_vers,
-                       &(parg->arg_rename2.to.dir),
-                       &(parg->arg_rename3.to.dir),
-                       NULL,
-                       strto);
       LogDebug(COMPONENT_NFSPROTO,
                "REQUEST PROCESSING: Calling nfs_Rename from handle: %s name %s to handle: %s name: %s",
                strfrom, str_entry_name, strto, str_new_entry_name);
@@ -152,13 +150,74 @@ int nfs_Rename(nfs_arg_t *parg,
       pnew_pre_attr = NULL;
     }
 
+  /* Get the exportids for the two handles. */
+  switch (preq->rq_vers)
+    {
+    case NFS_V2:
+      {
+        to_exportid = nfs2_FhandleToExportId(&(parg->arg_rename2.to.dir));
+        from_exportid = nfs2_FhandleToExportId(&(parg->arg_rename2.from.dir));
+        break;
+      }
+    case NFS_V3:
+      {
+        to_exportid = nfs3_FhandleToExportId(&(parg->arg_rename3.to.dir));
+        from_exportid = nfs3_FhandleToExportId(&(parg->arg_rename3.from.dir));
+        break;
+      }
+    }
+
+  /* Validate the to_exportid */
+  if(to_exportid < 0)
+    {
+      LogInfo(COMPONENT_DISPATCH,
+              "NFS%d RENAME Request from client %s has badly formed handle for to dir",
+              preq->rq_vers, pworker->hostaddr_str);
+
+      /* Bad handle, report to client */
+      if(preq->rq_vers == NFS_V2)
+        pres->res_dirop2.status = NFSERR_STALE;
+      else
+        pres->res_rename3.status = NFS3ERR_BADHANDLE;
+      goto out;
+    }
+
+  if(nfs_Get_export_by_id(nfs_param.pexportlist,
+                          to_exportid) == NULL)
+    {
+      LogInfo(COMPONENT_DISPATCH,
+              "NFS%d RENAME Request from client %s has invalid export %d for to dir",
+              preq->rq_vers, pworker->hostaddr_str,
+              to_exportid);
+
+      /* Bad export, report to client */
+      if(preq->rq_vers == NFS_V2)
+        pres->res_dirop2.status = NFSERR_STALE;
+      else
+        pres->res_rename3.status = NFS3ERR_STALE;
+      goto out;
+    }
+
+  /*
+   * Both objects have to be in the same filesystem 
+   */
+
+  if(to_exportid != from_exportid)
+    {
+      if(preq->rq_vers == NFS_V2)
+        pres->res_dirop2.status = NFSERR_PERM;
+      if(preq->rq_vers == NFS_V3)
+        pres->res_rename3.status = NFS3ERR_XDEV;
+      goto out;
+    }
+
   /* Convert fromdir file handle into a cache_entry */
   if((parent_pentry = nfs_FhandleToCache(preq->rq_vers,
                                          &(parg->arg_rename2.from.dir),
                                          &(parg->arg_rename3.from.dir),
                                          NULL,
                                          &(pres->res_dirop2.status),
-                                         &(pres->res_create3.status),
+                                         &(pres->res_rename3.status),
                                          NULL,
                                          &pre_attr, pcontext, &rc)) == NULL)
     {
@@ -172,7 +231,7 @@ int nfs_Rename(nfs_arg_t *parg,
                                              &(parg->arg_rename3.to.dir),
                                              NULL,
                                              &(pres->res_dirop2.status),
-                                             &(pres->res_create3.status),
+                                             &(pres->res_rename3.status),
                                              NULL,
                                              &new_parent_attr,
                                              pcontext, &rc)) == NULL)
@@ -198,7 +257,7 @@ int nfs_Rename(nfs_arg_t *parg,
       switch (preq->rq_vers)
         {
         case NFS_V2:
-          pres->res_stat2 = NFSERR_NOTDIR;
+          pres->res_dirop2.status = NFSERR_NOTDIR;
           break;
 
         case NFS_V3:
@@ -267,7 +326,7 @@ int nfs_Rename(nfs_arg_t *parg,
               switch (preq->rq_vers)
                 {
                 case NFS_V2:
-                  pres->res_stat2 = NFS_OK;
+                  pres->res_dirop2.status = NFS_OK;
                   break;
 
                 case NFS_V3:
@@ -306,7 +365,7 @@ int nfs_Rename(nfs_arg_t *parg,
                   switch (preq->rq_vers)
                     {
                     case NFS_V2:
-                      pres->res_stat2 = NFS_OK;
+                      pres->res_dirop2.status = NFS_OK;
                       break;
 
                     case NFS_V3:
@@ -357,7 +416,7 @@ int nfs_Rename(nfs_arg_t *parg,
                       switch (preq->rq_vers)
                         {
                         case NFS_V2:
-                          pres->res_stat2 = NFS_OK;
+                          pres->res_dirop2.status = NFS_OK;
                           break;
 
                         case NFS_V3:
@@ -408,7 +467,7 @@ int nfs_Rename(nfs_arg_t *parg,
                               switch (preq->rq_vers)
                                 {
                                 case NFS_V2:
-                                  pres->res_stat2 = NFS_OK;
+                                  pres->res_dirop2.status = NFS_OK;
                                   break;
 
                                 case NFS_V3:
@@ -451,7 +510,7 @@ int nfs_Rename(nfs_arg_t *parg,
 
   /* If we are here, there was an error */
   rc = nfs_SetFailedStatus(pexport, preq->rq_vers, cache_status,
-                           &pres->res_stat2, &pres->res_rename3.status,
+                           &pres->res_dirop2.status, &pres->res_rename3.status,
                            NULL, ppre_attr,
                            &(pres->res_rename3.RENAME3res_u.resfail.fromdir_wcc),
                            pnew_pre_attr,

@@ -71,22 +71,4 @@ char *nfsstat4_to_str(nfsstat4 code);
 char *nfstype2_to_str(ftype2 code);
 char *nfstype3_to_str(ftype3 code);
 
-void nfs4_sprint_fhandle(nfs_fh4 * fh4p, char *outstr) ;
-
-/* Hash and LRU functions */
-unsigned long decimal_simple_hash_func(hash_parameter_t * p_hparam,
-                                       hash_buffer_t * buffclef);
-unsigned long decimal_rbt_hash_func(hash_parameter_t * p_hparam,
-                                    hash_buffer_t * buffclef);
-
-int display_cache(hash_buffer_t * pbuff, char *str);
-int compare_cache(hash_buffer_t * buff1, hash_buffer_t * buff2);
-int print_cache(LRU_data_t data, char *str);
-int clean_cache(LRU_entry_t * pentry, void *addparam);
-
-int lru_data_entry_to_str(LRU_data_t data, char *str);
-int lru_inode_clean_entry(LRU_entry_t * entry, void *adddata);
-int lru_data_clean_entry(LRU_entry_t * entry, void *adddata);
-int lru_inode_entry_to_str(LRU_data_t data, char *str);
-
 #endif                          /* _NFS_TOOLS_H */

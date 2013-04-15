@@ -61,6 +61,7 @@
 #include "nfs_exports.h"
 #include "nfs_creds.h"
 #include "nfs_proto_functions.h"
+#include "nfs_proto_tools.h"
 #include "nfs_tools.h"
 #include "nfs_file_handle.h"
 
@@ -98,8 +99,14 @@ int nfs4_op_restorefh(struct nfs_argop4 *op,
   resp->resop = NFS4_OP_RESTOREFH;
   res_RESTOREFH.status = NFS4_OK;
 
-  /* If there is no currentFH, teh return an error */
-  if(nfs4_Is_Fh_Empty(&(data->savedFH)))
+  LogFullDebugOpaque(COMPONENT_FILEHANDLE,
+                     "Saved FH %s",
+                     LEN_FH_STR,
+                     data->savedFH.nfs_fh4_val,
+                     data->savedFH.nfs_fh4_len);
+
+  /* If there is no savedFH, then return an error */
+  if(nfs4_Is_Fh_Empty(&(data->savedFH)) != NFS4_OK)
     {
       /* There is no current FH, return NFS4ERR_RESTOREFH (cg RFC3530,
          page 202) */
@@ -107,19 +114,10 @@ int nfs4_op_restorefh(struct nfs_argop4 *op,
       return res_RESTOREFH.status;
     }
 
-  /* If the filehandle is invalid */
-  if(nfs4_Is_Fh_Invalid(&(data->savedFH)))
-    {
-      res_RESTOREFH.status = NFS4ERR_BADHANDLE;
-      return res_RESTOREFH.status;
-    }
-
-  /* Tests if the Filehandle is expired (for volatile filehandle) */
-  if(nfs4_Is_Fh_Expired(&(data->savedFH)))
-    {
-      res_RESTOREFH.status = NFS4ERR_FHEXPIRED;
-      return res_RESTOREFH.status;
-    }
+  /* Do basic checks on saved filehandle */
+  res_RESTOREFH.status = nfs4_sanity_check_SavedFH(data, 0LL);
+  if(res_RESTOREFH.status != NFS4_OK)
+    return res_RESTOREFH.status;
 
   /* Copy the data from current FH to saved FH */
   memcpy(data->currentFH.nfs_fh4_val,
@@ -166,15 +164,6 @@ int nfs4_op_restorefh(struct nfs_argop4 *op,
   }
 
  out:
-
-  if(isFullDebug(COMPONENT_NFS_V4))
-    {
-      char str[LEN_FH_STR];
-      sprint_fhandle4(str, &data->currentFH);
-      LogFullDebug(COMPONENT_NFS_V4,
-                   "RESTORE FH: Current FH %s", str);
-    }
-
 
   return NFS4_OK;
 }                               /* nfs4_op_restorefh */

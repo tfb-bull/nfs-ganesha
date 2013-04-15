@@ -44,8 +44,11 @@ static unsigned long hash_digest_idx(hash_parameter_t * p_conf, hash_buffer_t * 
 static unsigned long hash_digest_rbt(hash_parameter_t * p_conf, hash_buffer_t * p_key);
 static int cmp_digest(hash_buffer_t * p_key1, hash_buffer_t * p_key2);
 
-static int print_digest(hash_buffer_t * p_val, char *outbuff);
-static int print_handle(hash_buffer_t * p_val, char *outbuff);
+static int print_digest(struct display_buffer * dspbuf,
+                        hash_buffer_t         * p_val);
+
+static int print_handle(struct display_buffer * dspbuf,
+                        hash_buffer_t         * p_val);
 
 /* DEFAULT PARAMETERS for hash table */
 
@@ -176,19 +179,20 @@ static int cmp_digest(hash_buffer_t * p_key1, hash_buffer_t * p_key2)
     return 0;
 }
 
-static int print_digest(hash_buffer_t * p_val, char *outbuff)
+static int print_digest(struct display_buffer * dspbuf,
+                        hash_buffer_t         * p_val)
 {
-  digest_pool_entry_t *p_digest = (digest_pool_entry_t *) p_val->pdata;
+  digest_pool_entry_t *p_digest = p_val->pdata;
 
-  return sprintf(outbuff, "%llu, %u", (unsigned long long)p_digest->nfs23_digest.object_id,
-                 p_digest->nfs23_digest.handle_hash);
+  return displayt_printf(dspbuf, "%llu, %u",
+                         (unsigned long long)p_digest->nfs23_digest.object_id,
+                         p_digest->nfs23_digest.handle_hash);
 }
 
-static int print_handle(hash_buffer_t * p_val, char *outbuff)
+static int print_handle(struct display_buffer * dspbuf,
+                        hash_buffer_t         * p_val)
 {
-  handle_pool_entry_t *p_handle = (handle_pool_entry_t *) p_val->pdata;
-
-  return snprintHandle(outbuff, HASHTABLE_DISPLAY_STRLEN, &p_handle->handle);
+  return display_FSAL_handle(dspbuf, p_val->pdata);
 }
 
 int handle_mapping_hash_add(hash_table_t * p_hash,

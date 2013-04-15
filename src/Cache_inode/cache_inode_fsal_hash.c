@@ -52,98 +52,6 @@
 
 /**
  *
- * cache_inode_fsal_hash_func: Compute the hash value for the cache_inode hash table.
- *
- * Computes the hash value for the cache_inode hash table. This function is specific
- * to use with HPSS/FSAL.
- *
- * @param hparam [IN] hash table parameter.
- * @param buffclef [IN] key to be used for computing the hash value.
- * @return the computed hash value.
- *
- */
-uint32_t cache_inode_fsal_hash_func(hash_parameter_t * p_hparam,
-                                    hash_buffer_t * buffclef)
-{
-    unsigned long h = 0;
-    char printbuf[512];
-    fsal_handle_t *pfsal_handle = (fsal_handle_t *) (buffclef->pdata);
-
-    h = FSAL_Handle_to_HashIndex(pfsal_handle, 0,
-                                 p_hparam->alphabet_length,
-                                 p_hparam->index_size);
-
-    if(isFullDebug(COMPONENT_HASHTABLE) && isFullDebug(COMPONENT_CACHE_INODE))
-        {
-            snprintHandle(printbuf, 512, pfsal_handle);
-            LogFullDebug(COMPONENT_CACHE_INODE,
-                         "hash_func key: buff = (Handle=%s, Cookie=%"PRIu64"), hash value=%lu",
-                         printbuf, 0UL, h);
-        }
-
-    return h;
-}                               /* cache_inode_fsal_hash_func */
-
-/**
- *
- * cache_inode_fsal_rbt_func: Compute the rbt value for the cache_inode hash table.
- *
- * Computes the rbt value for the cache_inode hash table. This function is specific
- * to use with HPSS/FSAL.
- *
- * @param hparam [IN] hash table parameter.
- * @param buffclef [IN] key to be used for computing the hash value.
- * @return the computed rbt value.
- *
- */
-uint64_t cache_inode_fsal_rbt_func(hash_parameter_t * p_hparam,
-                                   hash_buffer_t * buffclef)
-{
-    /*
-     * A polynomial function too, but reversed, to avoid
-     * producing same value as decimal_simple_hash_func
-     */
-    uint32_t h = 0;
-    char printbuf[512];
-    fsal_handle_t *pfsal_handle = (fsal_handle_t *) (buffclef->pdata);
-
-    h = Lookup3_hash_buff((char *)pfsal_handle, buffclef->len );
-
-    if(isFullDebug(COMPONENT_HASHTABLE) && isFullDebug(COMPONENT_CACHE_INODE))
-        {
-            snprintHandle(printbuf, 512, pfsal_handle);
-            LogFullDebug(COMPONENT_CACHE_INODE,
-                         "hash_func rbt: buff = (Handle=%s, Cookie=%"PRIu64"), value=%u",
-                         printbuf, 0UL, h);
-        }
-    return h;
-}                               /* cache_inode_fsal_rbt_func */
-
-unsigned long __cache_inode_fsal_rbt_func(hash_parameter_t * p_hparam,
-                                        hash_buffer_t * buffclef)
-{
-    /*
-     * A polynomial function too, but reversed, to avoid
-     * producing same value as decimal_simple_hash_func
-     */
-    unsigned long h = 0;
-    fsal_handle_t *pfsal_handle = (fsal_handle_t *) (buffclef->pdata);
-    char printbuf[512];
-
-    h = FSAL_Handle_to_RBTIndex(pfsal_handle, 0);
-
-    if(isFullDebug(COMPONENT_HASHTABLE) && isFullDebug(COMPONENT_CACHE_INODE))
-        {
-            snprintHandle(printbuf, 512, pfsal_handle);
-            LogFullDebug(COMPONENT_CACHE_INODE,
-                         "hash_func rbt: buff = (Handle=%s, Cookie=%"PRIu64"), value=%lu",
-                         printbuf, 0UL, h);
-        }
-    return h;
-}                               /* cache_inode_fsal_rbt_func */
-
-/**
- *
  * cache_inode_fsal_rbt_both: Computes both the rbt value and the hash value in one pass.
  *
  *  Computes both the rbt value and the hash value in one pass.
@@ -162,7 +70,6 @@ static int cache_inode_fsal_rbt_both_on_fsal(hash_parameter_t * p_hparam,
                                              uint32_t * phashval,
                                              uint64_t * prbtval)
 {
-    char printbuf[512];
     unsigned int rc = 0 ;
     /* ACE: This is a temporary hack so we don't have to change every FSAL
        right now. */
@@ -184,7 +91,11 @@ static int cache_inode_fsal_rbt_both_on_fsal(hash_parameter_t * p_hparam,
     *prbtval = FSALrbt;
     if( rc == 0 )
       {
-          snprintHandle(printbuf, 512, pfsal_handle);
+          char                  printbuf[FSAL_HANDLE_STR_LEN];
+          struct display_buffer dspbuf = {sizeof(printbuf), printbuf, printbuf};
+
+          (void) display_FSAL_handle(&dspbuf, pfsal_handle);
+
           LogMajor(COMPONENT_CACHE_INODE,
                    "Unable to hash (Handle=%s)",
                    printbuf);
@@ -193,7 +104,11 @@ static int cache_inode_fsal_rbt_both_on_fsal(hash_parameter_t * p_hparam,
 
     if(isFullDebug(COMPONENT_HASHTABLE) && isFullDebug(COMPONENT_CACHE_INODE))
       {
-          snprintHandle(printbuf, 512, buffclef->pdata);
+          char                  printbuf[FSAL_HANDLE_STR_LEN];
+          struct display_buffer dspbuf = {sizeof(printbuf), printbuf, printbuf};
+
+          (void) display_FSAL_handle(&dspbuf, pfsal_handle);
+
           LogFullDebug(COMPONENT_CACHE_INODE,
                        "hash_func rbt both: buff = (Handle=%s, Cookie=%"PRIu64"), hashvalue=%u rbtvalue=%u",
                        printbuf, 0UL, FSALindex, FSALrbt);
@@ -208,7 +123,6 @@ static int cache_inode_fsal_rbt_both_locally(hash_parameter_t * p_hparam,
                                              uint32_t * phashval,
                                              uint64_t * prbtval)
 {
-    char printbuf[512];
     uint32_t h1 = 0 ;
     uint32_t h2 = 0 ;
     fsal_handle_t *pfsal_handle = (fsal_handle_t *) (buffclef->pdata);
@@ -223,7 +137,11 @@ static int cache_inode_fsal_rbt_both_locally(hash_parameter_t * p_hparam,
 
     if(isFullDebug(COMPONENT_HASHTABLE) && isFullDebug(COMPONENT_CACHE_INODE))
         {
-            snprintHandle(printbuf, 512, pfsal_handle);
+            char                  printbuf[FSAL_HANDLE_STR_LEN];
+            struct display_buffer dspbuf = {sizeof(printbuf), printbuf, printbuf};
+
+            (void) display_FSAL_handle(&dspbuf, pfsal_handle);
+
             LogFullDebug(COMPONENT_CACHE_INODE,
                          "hash_func rbt both: buff = (Handle=%s, Cookie=%"PRIu64"), hashvalue=%u rbtvalue=%u",
                          printbuf, 0UL, h1, h2 );
@@ -242,34 +160,4 @@ int cache_inode_fsal_rbt_both( hash_parameter_t * p_hparam,
     return cache_inode_fsal_rbt_both_locally( p_hparam, buffclef, phashval, prbtval ) ;
   else
     return cache_inode_fsal_rbt_both_on_fsal( p_hparam, buffclef, phashval, prbtval ) ;
-}
-
-
-
-int display_key(hash_buffer_t * pbuff, char *str)
-{
-    char buffer[128];
-
-    snprintHandle(buffer, 128, pbuff->pdata);
-
-    return snprintf(str, HASHTABLE_DISPLAY_STRLEN,
-                    "(Handle=%s, Cookie=%"PRIu64")", buffer, 0UL);
-}
-
-int display_not_implemented(hash_buffer_t * pbuff, char *str)
-{
-
-    return snprintf(str, HASHTABLE_DISPLAY_STRLEN,
-                    "Print Not Implemented");
-}
-
-int display_value(hash_buffer_t * pbuff, char *str)
-{
-    cache_entry_t *pentry;
-
-    pentry = (cache_entry_t *) pbuff->pdata;
-
-    return snprintf(str, HASHTABLE_DISPLAY_STRLEN,
-                    "(Type=%d, Address=%p)",
-                    pentry->type, pentry);
 }

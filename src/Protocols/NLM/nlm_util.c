@@ -141,15 +141,6 @@ void netobj_free(netobj * obj)
     gsh_free(obj->n_bytes);
 }
 
-void netobj_to_string(netobj *obj, char *buffer, int maxlen)
-{
-  int len = obj->n_len;
-  if((len * 2) + 10 > maxlen)
-    len = (maxlen - 10) / 2;
-
-  DisplayOpaqueValue(obj->n_bytes, len, buffer);
-}
-
 void nlm_init(void)
 {
   /* start NLM grace period */
@@ -181,7 +172,8 @@ void free_grant_arg(state_async_queue_t *arg)
 static void nlm4_send_grant_msg(state_async_queue_t *arg)
 {
   int                      retval;
-  char                     buffer[1024];
+  char                     buffer[NETOBJ_MAX_STRING];
+  struct display_buffer    dspbuf = {sizeof(buffer), buffer, buffer};
   state_status_t           state_status = STATE_SUCCESS;
   state_cookie_entry_t   * cookie_entry;
   fsal_op_context_t        context, * pcontext = &context;
@@ -189,8 +181,7 @@ static void nlm4_send_grant_msg(state_async_queue_t *arg)
 
   if(isDebug(COMPONENT_NLM))
     {
-      netobj_to_string(&nlm_arg->nlm_async_args.nlm_async_grant.cookie,
-                       buffer, sizeof(buffer));
+      (void) display_netobj(&dspbuf, &nlm_arg->nlm_async_args.nlm_async_grant.cookie);
 
       LogDebug(COMPONENT_NLM,
                "Sending GRANTED for arg=%p svid=%d start=%llx len=%llx cookie=%s",
@@ -611,29 +602,29 @@ bool_t nlm_block_data_to_fsal_context(state_block_data_t * block_data,
   exportid = nlm4_FhandleToExportId(&nlm_block_data->sbd_nlm_fh);
 
   /* Get export matching export ID */
-  if(exportid < 0 ||
-     (pexport = nfs_Get_export_by_id(nfs_param.pexportlist, exportid)) == NULL ||
+  if((pexport = nfs_Get_export_by_id(nfs_param.pexportlist, exportid)) == NULL ||
      (pexport->export_perms.options & EXPORT_OPTION_NFSV3) == 0)
     {
       /* Reject the request for authentication reason (incompatible file handle) */
       if(isInfo(COMPONENT_NLM))
         {
-          char dumpfh[1024];
-          char *reason;
           char addrbuf[SOCK_NAME_MAX];
+
           sprint_sockaddr(&nlm_block_data->sbd_nlm_hostaddr,
                           addrbuf,
                           sizeof(addrbuf));
           if(exportid < 0)
-            reason = "has badly formed handle";
+            LogInfo(COMPONENT_NLM,
+                    "NLM4 granted lock from client %s has badly formed handle",
+                    addrbuf);
           else if(pexport == NULL)
-            reason = "has invalid export";
+            LogInfo(COMPONENT_NLM,
+                    "NLM4 granted lock from client %s has invalid export %d",
+                    addrbuf, exportid);
           else
-            reason = "V3 not allowed on this export";
-          sprint_fhandle_nlm(dumpfh, &nlm_block_data->sbd_nlm_fh);
-          LogMajor(COMPONENT_NLM,
-                   "NLM4 granted lock from host %s %s, FH=%s",
-                   addrbuf, reason, dumpfh);
+            LogInfo(COMPONENT_NLM,
+                    "NLM4 granted lock from client %s V3 is not allowed on export %d",
+                    addrbuf, exportid);
         }
 
       return FALSE;
@@ -749,11 +740,13 @@ state_status_t nlm_granted_callback(cache_entry_t        * pentry,
   inarg->alock.svid     = nlm_grant_owner->so_nlm_svid;
   inarg->alock.l_offset = lock_entry->sle_lock.lock_start;
   inarg->alock.l_len    = lock_entry->sle_lock.lock_length;
+
   if(isDebug(COMPONENT_NLM))
     {
-      char buffer[1024];
+      char                    buffer[NETOBJ_MAX_STRING];
+      struct display_buffer   dspbuf = {sizeof(buffer), buffer, buffer};
 
-      netobj_to_string(&inarg->cookie, buffer, sizeof(buffer));
+      (void) display_netobj(&dspbuf, &inarg->cookie);
 
       LogDebug(COMPONENT_NLM,
                "Sending GRANTED for arg=%p svid=%d start=%llx len=%llx cookie=%s",

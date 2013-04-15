@@ -101,7 +101,17 @@ struct alloc_file_handle_v3 {
 
 static inline size_t nfs3_sizeof_handle(struct file_handle_v3 *hdl)
 {
-	return offsetof(struct file_handle_v3, fsopaque) + hdl->fs_len;
+	int padding = 0;
+	int len = offsetof(struct file_handle_v3, fsopaque) + hdl->fs_len;
+
+	/* Correct packet's fh length so it's divisible by 4 to trick dNFS into
+	 * working. This is essentially sending the padding.
+	 */
+	padding = (4 - (len % 4)) % 4;
+	if ((len + padding) <= sizeof(struct alloc_file_handle_v3))
+		len += padding;
+
+	return len;
 }
 
 /* This is up to 128 bytes, aligned on 32 bits
@@ -137,7 +147,10 @@ static inline size_t nfs4_sizeof_handle(struct file_handle_v4 *hdl)
 	return offsetof(struct file_handle_v4, fsopaque) + hdl->fs_len;
 }
 
-#define LEN_FH_STR 1024
+/* Define size of string buffer to hold an NFS handle large enough
+ * to hold a display_opaque_value of an NFS v4 handle (plus a bit).
+ */
+#define LEN_FH_STR (NFS4_FHSIZE * 2 + 10)
 
 
 /* File handle translation utility */
@@ -161,15 +174,7 @@ int nfs2_FSALToFhandle(fhandle2 * pfh2, fsal_handle_t * pfsalhandle,
 
 /* Extraction of export id from a file handle */
 short nfs2_FhandleToExportId(fhandle2 * pfh2);
-short nfs4_FhandleToExportId(nfs_fh4 * pfh4);
 short nfs3_FhandleToExportId(nfs_fh3 * pfh3);
-
-#ifdef _USE_NLM
-short nlm4_FhandleToExportId(netobj * pfh3);
-#endif
-
-/* nfs3 validation */
-int nfs3_Is_Fh_Invalid(nfs_fh3 *pfh3);
 
 /* NFSv4 specific FH related functions */
 int nfs4_Is_Fh_Empty(nfs_fh4 * pfh);
@@ -180,34 +185,72 @@ int nfs4_Is_Fh_Invalid(nfs_fh4 * pfh);
 int nfs4_Is_Fh_Referral(nfs_fh4 * pfh);
 int nfs4_Is_Fh_DSHandle(nfs_fh4 * pfh);
 
+/**
+ *
+ * nfs4_FhandleToExportId
+ *
+ * This routine extracts the export id from the file handle NFSv4
+ *
+ * @param pfh4 [IN] file handle to manage.
+ * 
+ * @return the export id.
+ *
+ */
+static inline short nfs4_FhandleToExportId(nfs_fh4 * pfh4)
+{
+  file_handle_v4_t *pfile_handle = (file_handle_v4_t *) (pfh4->nfs_fh4_val);
+
+  if(nfs4_Is_Fh_Invalid(pfh4) != NFS4_OK)
+    return -1;                  /* Badly formed arguments */
+
+  if(nfs4_Is_Fh_Pseudo(pfh4))
+    {
+      LogDebug(COMPONENT_FILEHANDLE,
+               "INVALID HANDLE: PseudoFS handle");
+      return -1;
+    }
+
+  return pfile_handle->exportid;
+}                               /* nfs4_FhandleToExportId */
+
+
+#ifdef _USE_NLM
+static inline short nlm4_FhandleToExportId(netobj * pfh3)
+{
+  nfs_fh3 fh3;
+  if(pfh3 == NULL)
+    return nfs3_FhandleToExportId(NULL);
+  fh3.data.data_val = pfh3->n_bytes;
+  fh3.data.data_len = pfh3->n_len;
+  return nfs3_FhandleToExportId(&fh3);
+}
+#endif
+
+/* nfs3 validation */
+int nfs3_Is_Fh_Invalid(nfs_fh3 *pfh3);
+
 /* This one is used to detect Xattr related FH */
 int nfs3_Is_Fh_Xattr(nfs_fh3 * pfh);
 
-/* File handle print function (;ostly use for debugging) */
-void print_fhandle2(log_components_t component, fhandle2 *fh);
-void print_fhandle3(log_components_t component, nfs_fh3 *fh);
-void print_fhandle4(log_components_t component, nfs_fh4 *fh);
-void print_fhandle_nlm(log_components_t component, netobj *fh);
-void print_buff(log_components_t component, char *buff, int len);
-void LogCompoundFH(compound_data_t * data);
+/* File handle display functions */
 
-void sprint_fhandle2(char *str, fhandle2 *fh);
-void sprint_fhandle3(char *str, nfs_fh3 *fh);
-void sprint_fhandle4(char *str, nfs_fh4 *fh);
-void sprint_fhandle_nlm(char *str, netobj *fh);
-void sprint_buff(char *str, char *buff, int len);
-void sprint_mem(char *str, char *buff, int len);
+static inline int display_fhandle2(struct display_buffer * dspbuf,
+                                   fhandle2              * fh)
+{
+  return display_opaque_value(dspbuf, fh, sizeof(*fh));
+}
 
-void nfs4_sprint_fhandle(nfs_fh4 * fh4p, char *outstr) ;
+static inline int display_fhandle3(struct display_buffer * dspbuf,
+                                   nfs_fh3               * fh)
+{
+  return display_opaque_value(dspbuf, fh->data.data_val, fh->data.data_len);
+}
 
-#define LogHandleNFS4( label, fh4p )                        \
-  do {                                                      \
-    if(isFullDebug(COMPONENT_NFS_V4))                       \
-      {                                                     \
-        char str[LEN_FH_STR];                               \
-        sprint_fhandle4(str, fh4p);                         \
-        LogFullDebug(COMPONENT_NFS_V4, "%s%s", label, str); \
-      }                                                     \
-  } while (0)
+
+static inline int display_fhandle_nlm(struct display_buffer * dspbuf,
+                                      netobj                * fh)
+{
+  return display_opaque_value(dspbuf, fh->n_bytes, fh->n_len);
+}
 
 #endif                          /* _NFS_FILE_HANDLE_H */

@@ -49,14 +49,12 @@
 #include <sys/param.h>
 
 
-#include "LRU_List.h"
 #include "fsal.h"
 #include "cache_inode.h"
 #include "nfs_exports.h"
 #include "nfs_creds.h"
 #include "nfs_file_handle.h"
 
-#include "err_LRU_List.h"
 #include "err_HashTable.h"
 
 #define  NFS4_ATTRVALS_BUFFLEN  1024
@@ -866,7 +864,7 @@ int nfs4_op_getattr_pseudo(struct nfs_argop4 *op,
 int nfs4_op_access_pseudo(struct nfs_argop4 *op,
                           compound_data_t * data, struct nfs_resop4 *resp);
 
-void set_compound_data_for_pseudo(compound_data_t * data);
+int set_compound_data_for_pseudo(compound_data_t * data);
 
 int nfs4_op_lookup_pseudo(struct nfs_argop4 *op,
                           compound_data_t * data, struct nfs_resop4 *resp);
@@ -1389,7 +1387,6 @@ void compound_data_Free(compound_data_t * data);
 int nfs4_ExportToPseudoFS(struct glist_head * pexportlist);
 pseudofs_t *nfs4_GetPseudoFs(void);
 
-int nfs4_SetCompoundExport(compound_data_t * data);
 int nfs4_MakeCred(compound_data_t * data);
 
 int nfs4_fsal_attr_To_Fattr(fsal_attrib_list_t * pattr, fattr4 * Fattr,
@@ -1569,8 +1566,6 @@ int nfs4_AllocateFH(nfs_fh4 * fh);
 
 uint64_t nfs_htonl64(uint64_t arg64);
 uint64_t nfs_ntohl64(uint64_t arg64);
-
-int idmap_compute_hash_value(char *name, uint32_t * phashval);
 
 int nfs4_Is_Fh_Referral(nfs_fh4 * pfh);
 int nfs4_Set_Fh_Referral(nfs_fh4 * pfh);

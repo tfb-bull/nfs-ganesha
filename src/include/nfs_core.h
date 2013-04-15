@@ -56,7 +56,6 @@
 #include "nfs_proto_functions.h"
 #include "nfs_tcb.h"
 #include "wait_queue.h"
-#include "err_LRU_List.h"
 #include "err_HashTable.h"
 
 #include "fsal_up.h"
@@ -185,7 +184,6 @@ typedef char path_str_t[MAXPATHLEN] ;
 
 typedef struct nfs_worker_param__
 {
-  LRU_parameter_t lru_dupreq;
   unsigned int nb_before_gc;
 } nfs_worker_parameter_t;
 
@@ -533,7 +531,6 @@ free_nfs_res(nfs_res_t *res)
 struct nfs_worker_data__
 {
   unsigned int worker_index;
-  LRU_list_t *duplicate_request;
   hash_table_t *ht_ip_stats;
 
   wait_q_entry_t wqe;
@@ -580,8 +577,6 @@ typedef struct ganesha_stats__ {
     hash_stat_t             ip_name_map;
     hash_stat_t             uid_reverse;
     hash_stat_t             gid_reverse;
-    hash_stat_t             drc_udp;
-    hash_stat_t             drc_tcp;
     fsal_statistics_t       global_fsal;
     unsigned long long     total_fsal_calls;
 } ganesha_stats_t;
@@ -725,44 +720,29 @@ void Print_param_in_log();
 
 void nfs_reset_stats(void);
 
-int display_req_key(hash_buffer_t * pbuff, char *str);
-int display_req_val(hash_buffer_t * pbuff, char *str);
-int compare_req(hash_buffer_t * buff1, hash_buffer_t * buff2);
-
-int print_entry_dupreq(LRU_data_t data, char *str);
-int clean_entry_dupreq(LRU_entry_t * pentry, void *addparam);
-
-int print_pending_request(LRU_data_t data, char *str);
-
 const char * auth_stat2str(enum auth_stat);
 
-uint64_t idmapper_rbt_hash_func(hash_parameter_t * p_hparam,
-                                hash_buffer_t * buffclef);
-uint64_t namemapper_rbt_hash_func(hash_parameter_t * p_hparam,
-                                  hash_buffer_t * buffclef);
+uint64_t name_rbt_hash_func(hash_parameter_t * p_hparam,
+                            hash_buffer_t    * buffclef);
+uint64_t id_rbt_hash_func(hash_parameter_t * p_hparam,
+                          hash_buffer_t    * buffclef);
 
-uint32_t namemapper_value_hash_func(hash_parameter_t * p_hparam,
-                                             hash_buffer_t * buffclef);
-uint32_t idmapper_value_hash_func(hash_parameter_t * p_hparam,
-                                  hash_buffer_t * buffclef);
+uint32_t id_value_hash_func(hash_parameter_t * p_hparam,
+                            hash_buffer_t    * buffclef);
+uint32_t name_value_hash_func(hash_parameter_t * p_hparam,
+                              hash_buffer_t    * buffclef);
 
 int idmap_populate(char *path, idmap_type_t maptype);
 
-int idmap_gid_init(nfs_idmap_cache_parameter_t param);
-int idmap_gname_init(nfs_idmap_cache_parameter_t param);
+void idmapper_init();
 
-int idmap_uid_init(nfs_idmap_cache_parameter_t param);
-int idmap_uname_init(nfs_idmap_cache_parameter_t param);
-int uidgidmap_init(nfs_idmap_cache_parameter_t param);
+int display_idmapper_name(struct display_buffer * dspbuf, hash_buffer_t * pbuff);
+int display_idmapper_id(struct display_buffer * dspbuf, hash_buffer_t * pbuff);
 
-int display_idmapper_val(hash_buffer_t * pbuff, char *str);
-int display_idmapper_key(hash_buffer_t * pbuff, char *str);
-
-int compare_idmapper(hash_buffer_t * buff1, hash_buffer_t * buff2);
-int compare_namemapper(hash_buffer_t * buff1, hash_buffer_t * buff2);
+int compare_name(hash_buffer_t * buff1, hash_buffer_t * buff2);
+int compare_id(hash_buffer_t * buff1, hash_buffer_t * buff2);
 int compare_state_id(hash_buffer_t * buff1, hash_buffer_t * buff2);
 
-int idmap_compute_hash_value(char *name, uint32_t * phashval);
 int idmap_add(hash_table_t * ht, char *key, uint32_t val);
 int uidmap_add(char *key, uid_t val, int propagate);
 int gidmap_add(char *key, gid_t val);

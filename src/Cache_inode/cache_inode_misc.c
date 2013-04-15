@@ -76,8 +76,6 @@ const char *cache_inode_err_str(cache_inode_status_t err)
         return "CACHE_INODE_POOL_MUTEX_INIT_ERROR";
       case CACHE_INODE_GET_NEW_LRU_ENTRY:
         return "CACHE_INODE_GET_NEW_LRU_ENTRY";
-      case CACHE_INODE_UNAPPROPRIATED_KEY:
-        return "CACHE_INODE_UNAPPROPRIATED_KEY";
       case CACHE_INODE_INIT_ENTRY_FAILED:
         return "CACHE_INODE_INIT_ENTRY_FAILED";
       case CACHE_INODE_FSAL_ERROR:
@@ -204,6 +202,11 @@ int cache_inode_compare_key_fsal(hash_buffer_t *buff1,
   /* This line should never be reached */
 } /* cache_inode_compare_key_fsal */
 
+int display_cache_inode_key(struct display_buffer * dspbuf,
+                            hash_buffer_t         * buff)
+{
+  return display_opaque_value(dspbuf, buff->pdata, buff->len);
+}
 
 /**
  *

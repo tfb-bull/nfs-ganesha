@@ -155,7 +155,8 @@ cache_inode_operate_cached_dirent(cache_entry_t *directory,
      dirent = cache_inode_avl_qp_lookup_s(directory, dirent_key, 1);
      if ((!dirent) || (dirent->flags & DIR_ENTRY_FLAG_DELETED)) {
        if (!((directory->flags & CACHE_INODE_TRUST_CONTENT) &&
-             (directory->flags & CACHE_INODE_DIR_POPULATED))) {
+             (directory->flags & CACHE_INODE_DIR_POPULATED)) ||
+            (dirent_op == CACHE_INODE_DIRENT_OP_REMOVE)) {
          /* We cannot serve negative lookups. */
          /* status == CACHE_INODE_SUCCESS; */
        } else {
@@ -626,6 +627,9 @@ cache_inode_readdir(cache_entry_t *directory,
         added to the caller's result. */
      bool_t in_result = TRUE;
 
+     /* Set to TRUE if we invalidate the directory */
+     bool_t invalid = FALSE;
+
      /* Set the return default to CACHE_INODE_SUCCESS */
      *status = CACHE_INODE_SUCCESS;
 
@@ -713,7 +717,10 @@ cache_inode_readdir(cache_entry_t *directory,
      *nbfound = 0;
      *eod_met = FALSE;
 
-     while (in_result && dirent_node) {
+     for( ; 
+         in_result && dirent_node;
+         dirent_node = avltree_next(dirent_node)) {
+
           cache_entry_t *entry = NULL;
           cache_inode_status_t lookup_status = 0;
 
@@ -721,23 +728,27 @@ cache_inode_readdir(cache_entry_t *directory,
                                         cache_inode_dir_entry_t,
                                         node_hk);
 
-          if ((entry
-               = cache_inode_weakref_get(&dirent->entry,
-                                         LRU_REQ_SCAN))
-              == NULL) {
-               /* Entry fell out of the cache, load it back in. */
-               if ((entry
-                    = cache_inode_lookup_impl(directory,
-                                              &dirent->name,
-                                              context,
-                                              &lookup_status))
-                   == NULL) {
+          entry = cache_inode_weakref_get(&dirent->entry,
+                                          LRU_REQ_SCAN);
+
+          if(entry == NULL) {
+               /* Entry fell out of the cache, load it back in.
+                * Note that we don't restore the weakref...
+                */
+               entry = cache_inode_lookup_weakref(directory,
+                                                  &dirent->name,
+                                                  context,
+                                                  &lookup_status);
+
+               if(entry == NULL) {
+                    LogFullDebug(COMPONENT_NFS_READDIR,
+                                 "Lookup returned %s",
+                                 cache_inode_err_str(lookup_status));
                     if (lookup_status == CACHE_INODE_NOT_FOUND) {
                          /* Directory changed out from under us.
-                            Invalidate it, skip the name, and keep
-                            going. */
-                         atomic_clear_uint32_t_bits(&directory->flags,
-                                                    CACHE_INODE_TRUST_CONTENT);
+                            Indicate we should invalidate it,
+                            skip the name, and keep going. */
+                         invalid = TRUE;
                          continue;
                     } else {
                          /* Something is more seriously wrong,
@@ -776,7 +787,6 @@ cache_inode_readdir(cache_entry_t *directory,
           if (!in_result) {
                break;
           }
-          dirent_node = avltree_next(dirent_node);
      }
 
      /* We have reached the last node and every node traversed was
@@ -791,6 +801,23 @@ cache_inode_readdir(cache_entry_t *directory,
 unlock_dir:
 
      PTHREAD_RWLOCK_UNLOCK(&directory->content_lock);
+
+     if(invalid) {
+          cache_inode_status_t tmp_status;
+
+          PTHREAD_RWLOCK_WRLOCK(&directory->content_lock);
+
+          cache_inode_invalidate_all_cached_dirent(directory, &tmp_status);
+
+          if(tmp_status != CACHE_INODE_SUCCESS) {
+               LogCrit(COMPONENT_NFS_READDIR,
+                       "Error %s resolvind invalidated directory",
+                       cache_inode_err_str(tmp_status));
+          }
+
+          PTHREAD_RWLOCK_UNLOCK(&directory->content_lock);
+          
+     }
      return *status;
 
 unlock_attrs:

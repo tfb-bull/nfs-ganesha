@@ -95,8 +95,6 @@ static int CreatePUBFH4(nfs_fh4 * fh, compound_data_t * data)
   if(!nfs4_PseudoToFhandle(&(data->publicFH), &psfsentry))
     return NFS4ERR_BADHANDLE;
 
-  LogHandleNFS4("CREATE PUB FH: ", &data->publicFH);
-
   return NFS4_OK;
 }                               /* CreatePUBFH4 */
 
@@ -138,9 +136,6 @@ int nfs4_op_putpubfh(struct nfs_argop4 *op,
       cache_inode_put(data->current_entry);
   }
 
-  /* Fill in compound data */
-  set_compound_data_for_pseudo(data);
-
   /* I copy the public FH to the currentFH */
   if(data->currentFH.nfs_fh4_len == 0)
     {
@@ -152,9 +147,18 @@ int nfs4_op_putpubfh(struct nfs_argop4 *op,
   /* Copy the data from public FH to current FH */
   memcpy(data->currentFH.nfs_fh4_val, data->publicFH.nfs_fh4_val,
          data->publicFH.nfs_fh4_len);
+  data->currentFH.nfs_fh4_len = data->publicFH.nfs_fh4_len;
 
-  LogHandleNFS4("NFS4 PUTPUBFH PUBLIC  FH: ", &data->publicFH);
-  LogHandleNFS4("NFS4 PUTPUBFH CURRENT FH: ", &data->currentFH);
+  /* Fill in compound data */
+  res_PUTPUBFH4.status = set_compound_data_for_pseudo(data);
+  if(res_PUTPUBFH4.status != NFS4_OK)
+    return res_PUTPUBFH4.status;
+
+  LogFullDebugOpaque(COMPONENT_NFS_V4,
+                     "PUTPUBFH Current FH %s",
+                     LEN_FH_STR,
+                     data->currentFH.nfs_fh4_val,
+                     data->currentFH.nfs_fh4_len);
 
   LogFullDebug(COMPONENT_NFS_V4,
                     "NFS4 PUTPUBFH: Ending on status %d",

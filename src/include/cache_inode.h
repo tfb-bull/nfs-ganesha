@@ -546,47 +546,46 @@ typedef enum cache_inode_status_t
   CACHE_INODE_MALLOC_ERROR          = 1,
   CACHE_INODE_POOL_MUTEX_INIT_ERROR = 2,
   CACHE_INODE_GET_NEW_LRU_ENTRY     = 3,
-  CACHE_INODE_UNAPPROPRIATED_KEY    = 4,
-  CACHE_INODE_INIT_ENTRY_FAILED     = 5,
-  CACHE_INODE_FSAL_ERROR            = 6,
-  CACHE_INODE_LRU_ERROR             = 7,
-  CACHE_INODE_HASH_SET_ERROR        = 8,
-  CACHE_INODE_NOT_A_DIRECTORY       = 9,
-  CACHE_INODE_INCONSISTENT_ENTRY    = 10,
-  CACHE_INODE_BAD_TYPE              = 11,
-  CACHE_INODE_ENTRY_EXISTS          = 12,
-  CACHE_INODE_DIR_NOT_EMPTY         = 13,
-  CACHE_INODE_NOT_FOUND             = 14,
-  CACHE_INODE_INVALID_ARGUMENT      = 15,
-  CACHE_INODE_INSERT_ERROR          = 16,
-  CACHE_INODE_HASH_TABLE_ERROR      = 17,
-  CACHE_INODE_FSAL_EACCESS          = 18,
-  CACHE_INODE_IS_A_DIRECTORY        = 19,
-  CACHE_INODE_FSAL_EPERM            = 20,
-  CACHE_INODE_NO_SPACE_LEFT         = 21,
-  CACHE_INODE_CACHE_CONTENT_ERROR   = 22,
-  CACHE_INODE_CACHE_CONTENT_EXISTS  = 23,
-  CACHE_INODE_CACHE_CONTENT_EMPTY   = 24,
-  CACHE_INODE_READ_ONLY_FS          = 25,
-  CACHE_INODE_IO_ERROR              = 26,
-  CACHE_INODE_FSAL_ESTALE           = 27,
-  CACHE_INODE_FSAL_ERR_SEC          = 28,
-  CACHE_INODE_STATE_CONFLICT        = 29,
-  CACHE_INODE_QUOTA_EXCEEDED        = 30,
-  CACHE_INODE_DEAD_ENTRY            = 31,
-  CACHE_INODE_ASYNC_POST_ERROR      = 32,
-  CACHE_INODE_NOT_SUPPORTED         = 33,
-  CACHE_INODE_STATE_ERROR           = 34,
-  CACHE_INODE_DELAY                 = 35,
-  CACHE_INODE_NAME_TOO_LONG         = 36,
-  CACHE_INODE_BAD_COOKIE            = 40,
-  CACHE_INODE_FILE_BIG              = 41,
-  CACHE_INODE_KILLED                = 42,
-  CACHE_INODE_FILE_OPEN             = 43,
-  CACHE_INODE_MLINK                 = 44,
-  CACHE_INODE_SERVERFAULT           = 45,
-  CACHE_INODE_TOOSMALL              = 46,
-  CACHE_INODE_XDEV                  = 47,
+  CACHE_INODE_INIT_ENTRY_FAILED     = 4,
+  CACHE_INODE_FSAL_ERROR            = 5,
+  CACHE_INODE_LRU_ERROR             = 6,
+  CACHE_INODE_HASH_SET_ERROR        = 7,
+  CACHE_INODE_NOT_A_DIRECTORY       = 8,
+  CACHE_INODE_INCONSISTENT_ENTRY    = 9,
+  CACHE_INODE_BAD_TYPE              = 10,
+  CACHE_INODE_ENTRY_EXISTS          = 11,
+  CACHE_INODE_DIR_NOT_EMPTY         = 12,
+  CACHE_INODE_NOT_FOUND             = 13,
+  CACHE_INODE_INVALID_ARGUMENT      = 14,
+  CACHE_INODE_INSERT_ERROR          = 15,
+  CACHE_INODE_HASH_TABLE_ERROR      = 16,
+  CACHE_INODE_FSAL_EACCESS          = 17,
+  CACHE_INODE_IS_A_DIRECTORY        = 18,
+  CACHE_INODE_FSAL_EPERM            = 19,
+  CACHE_INODE_NO_SPACE_LEFT         = 20,
+  CACHE_INODE_CACHE_CONTENT_ERROR   = 21,
+  CACHE_INODE_CACHE_CONTENT_EXISTS  = 22,
+  CACHE_INODE_CACHE_CONTENT_EMPTY   = 23,
+  CACHE_INODE_READ_ONLY_FS          = 24,
+  CACHE_INODE_IO_ERROR              = 25,
+  CACHE_INODE_FSAL_ESTALE           = 26,
+  CACHE_INODE_FSAL_ERR_SEC          = 27,
+  CACHE_INODE_STATE_CONFLICT        = 28,
+  CACHE_INODE_QUOTA_EXCEEDED        = 29,
+  CACHE_INODE_DEAD_ENTRY            = 30,
+  CACHE_INODE_ASYNC_POST_ERROR      = 31,
+  CACHE_INODE_NOT_SUPPORTED         = 32,
+  CACHE_INODE_STATE_ERROR           = 33,
+  CACHE_INODE_DELAY                 = 34,
+  CACHE_INODE_NAME_TOO_LONG         = 35,
+  CACHE_INODE_BAD_COOKIE            = 36,
+  CACHE_INODE_FILE_BIG              = 37,
+  CACHE_INODE_KILLED                = 38,
+  CACHE_INODE_FILE_OPEN             = 39,
+  CACHE_INODE_MLINK                 = 40,
+  CACHE_INODE_SERVERFAULT           = 41,
+  CACHE_INODE_TOOSMALL              = 42,
+  CACHE_INODE_XDEV                  = 43,
 } cache_inode_status_t;
 
 /**
@@ -612,6 +611,10 @@ const char *cache_inode_err_str(cache_inode_status_t err);
 
 void cache_inode_clean_entry(cache_entry_t *entry);
 int cache_inode_compare_key_fsal(hash_buffer_t *buff1, hash_buffer_t *buff2);
+
+int display_cache_inode_key(struct display_buffer * dspbuf,
+                            hash_buffer_t         * buff);
+
 void cache_inode_release_symlink(cache_entry_t *entry);
 
 hash_table_t *cache_inode_init(cache_inode_parameter_t param,
@@ -691,6 +694,12 @@ cache_entry_t *cache_inode_lookup(cache_entry_t *entry_parent,
                                   fsal_attrib_list_t *attr,
                                   fsal_op_context_t *context,
                                   cache_inode_status_t *status);
+
+
+cache_entry_t * cache_inode_lookup_weakref(cache_entry_t *parent,
+                                           fsal_name_t *name,
+                                           fsal_op_context_t *context,
+                                           cache_inode_status_t *status);
 
 cache_entry_t *cache_inode_lookupp_impl(cache_entry_t *entry,
                                         fsal_op_context_t *context,
@@ -907,18 +916,10 @@ void cache_inode_expire_to_str(cache_inode_expire_type_t type,
 inline int cache_inode_set_time_current(fsal_time_t *ptime);
 
 /* Hash functions for hashtables and RBT */
-uint32_t cache_inode_fsal_hash_func(hash_parameter_t *p_hparam,
-                                         hash_buffer_t *buffclef);
-uint64_t cache_inode_fsal_rbt_func(hash_parameter_t *p_hparam,
-                                        hash_buffer_t *buffclef);
 int cache_inode_fsal_rbt_both(hash_parameter_t *p_hparam,
                               hash_buffer_t *buffclef,
                               uint32_t *phashval,
                               uint64_t *prbtval);
-int display_key(hash_buffer_t *pbuff, char *str);
-int display_not_implemented(hash_buffer_t *pbuff,
-                            char *str);
-int display_value(hash_buffer_t *pbuff, char *str);
 
 #define PTHREAD_RWLOCK_RDLOCK(_rwlock_) \
   pthread_rwlock_rdlock(_rwlock_)
