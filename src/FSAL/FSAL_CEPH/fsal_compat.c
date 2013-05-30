@@ -37,7 +37,6 @@
 #include "FSAL/common_methods.h"
 
 fsal_functions_t fsal_ceph_functions = {
-  .fsal_access = CEPHFSAL_access,
   .fsal_getattrs = CEPHFSAL_getattrs,
   .fsal_setattrs = CEPHFSAL_setattrs,
   .fsal_buildexportcontext = CEPHFSAL_BuildExportContext,
@@ -62,12 +61,7 @@ fsal_functions_t fsal_ceph_functions = {
   .fsal_dynamic_fsinfo = CEPHFSAL_dynamic_fsinfo,
   .fsal_init = CEPHFSAL_Init,
   .fsal_terminate = CEPHFSAL_terminate,
-  .fsal_test_access = CEPHFSAL_test_access,
-  .fsal_setattr_access = COMMON_setattr_access_notsupp,
-  .fsal_rename_access = COMMON_rename_access,
-  .fsal_create_access = COMMON_create_access,
-  .fsal_unlink_access = COMMON_unlink_access,
-  .fsal_link_access = COMMON_link_access,
+  .fsal_test_access = COMMON_test_access,
   .fsal_merge_attrs = COMMON_merge_attrs,
   .fsal_lookup = CEPHFSAL_lookup,
   .fsal_lookuppath = CEPHFSAL_lookupPath,

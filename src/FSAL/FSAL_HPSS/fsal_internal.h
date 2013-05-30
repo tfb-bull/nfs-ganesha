@@ -82,10 +82,6 @@ void ReleaseTokenFSCall();
 fsal_boolean_t fsal_do_log(fsal_status_t status);
 
 /* All the call to FSAL to be wrapped */
-fsal_status_t HPSSFSAL_access(hpssfsal_handle_t * p_object_handle,      /* IN */
-                              hpssfsal_op_context_t * p_context,        /* IN */
-                              fsal_accessflags_t access_type,   /* IN */
-                              fsal_attrib_list_t * p_object_attributes /* [ IN/OUT ] */ );
 
 fsal_status_t HPSSFSAL_getattrs(hpssfsal_handle_t * p_filehandle,       /* IN */
                                 hpssfsal_op_context_t * p_context,      /* IN */
@@ -210,27 +206,6 @@ fsal_status_t HPSSFSAL_dynamic_fsinfo(hpssfsal_handle_t * p_filehandle, /* IN */
 fsal_status_t HPSSFSAL_Init(fsal_parameter_t * init_info /* IN */ );
 
 fsal_status_t HPSSFSAL_terminate();
-
-fsal_status_t HPSSFSAL_test_access(hpssfsal_op_context_t * p_context,   /* IN */
-                                   fsal_accessflags_t access_type,      /* IN */
-                                   fsal_attrib_list_t * p_object_attributes /* IN */ );
-
-fsal_status_t HPSSFSAL_setattr_access(hpssfsal_op_context_t * p_context,        /* IN */
-                                      fsal_attrib_list_t * candidate_attributes,        /* IN */
-                                      fsal_attrib_list_t * object_attributes /* IN */ );
-
-fsal_status_t HPSSFSAL_rename_access(hpssfsal_op_context_t * pcontext,  /* IN */
-                                     fsal_attrib_list_t * pattrsrc,     /* IN */
-                                     fsal_attrib_list_t * pattrdest) /* IN */ ;
-
-fsal_status_t HPSSFSAL_create_access(hpssfsal_op_context_t * pcontext,  /* IN */
-                                     fsal_attrib_list_t * pattr) /* IN */ ;
-
-fsal_status_t HPSSFSAL_unlink_access(hpssfsal_op_context_t * pcontext,  /* IN */
-                                     fsal_attrib_list_t * pattr) /* IN */ ;
-
-fsal_status_t HPSSFSAL_link_access(hpssfsal_op_context_t * pcontext,    /* IN */
-                                   fsal_attrib_list_t * pattr) /* IN */ ;
 
 fsal_status_t HPSSFSAL_merge_attrs(fsal_attrib_list_t * pinit_attr,
                                    fsal_attrib_list_t * pnew_attr,

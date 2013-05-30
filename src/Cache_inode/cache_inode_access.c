@@ -74,160 +74,63 @@
 cache_inode_status_t
 cache_inode_access_sw(cache_entry_t *entry,
                       fsal_accessflags_t access_type,
+                      fsal_accessflags_t * allowed,
+                      fsal_accessflags_t * denied,
                       fsal_op_context_t *context,
                       cache_inode_status_t *status,
                       fsal_attrib_list_t *attrs,
                       int use_mutex)
 {
      fsal_status_t fsal_status;
-     fsal_accessflags_t used_access_type;
 
      LogFullDebug(COMPONENT_CACHE_INODE,
-                  "cache_inode_access_sw: access_type=0X%x",
+                  "access_type=0X%x",
                   access_type);
 
      /* Set the return default to CACHE_INODE_SUCCESS */
      *status = CACHE_INODE_SUCCESS;
 
-     /*
-      * We do no explicit access test in FSAL for FSAL_F_OK: it is
-      * considered that if an entry resides in the cache_inode, then a
-      * FSAL_getattrs was successfully made to populate the cache entry,
-      * this means that the entry exists. For this reason, F_OK is
-      * managed internally
-      */
-     if(access_type != FSAL_F_OK) {
-          /* We get ride of F_OK */
-          used_access_type = access_type & ~FSAL_F_OK;
-
-          /*
-           * Function FSAL_test_access is used instead of FSAL_access.
-           * This allow to take benefit of the previously cached
-           * attributes. This behavior is configurable via the
-           * configuration file.
-           */
-
-          if(cache_inode_params.use_test_access == 1) {
-               /* We actually need the lock here since we're using
-                  the attribute cache, so get it if the caller didn't
-                  acquire it.  */
-               if(use_mutex) {
-                    if ((*status
-                         = cache_inode_lock_trust_attrs(entry,
-                                                        context,
-                                                        FALSE))
-                        != CACHE_INODE_SUCCESS) {
-                         goto out;
-                    }
-               }
-               fsal_status
-                    = FSAL_test_access(context,
-                                       used_access_type,
-                                       &entry->attributes);
-               if (!FSAL_IS_ERROR(fsal_status) && attrs) {
-                    *attrs = entry->attributes;
-               }
-               if (use_mutex) {
-                    PTHREAD_RWLOCK_UNLOCK(&entry->attr_lock);
-               }
-          } else {
-               /* There is no reason to hold the mutex here, since we
-                  aren't doing anything with cached attributes. */
-                    fsal_status = FSAL_access(&entry->handle, context,
-                                              used_access_type, attrs);
+     /* We actually need the lock here since we're using
+        the attribute cache, so get it if the caller didn't
+        acquire it.  */
+     if(use_mutex) {
+          if ((*status
+               = cache_inode_lock_trust_attrs(entry,
+                                              context,
+                                              FALSE))
+              != CACHE_INODE_SUCCESS) {
+               goto out;
           }
+     }
+     fsal_status
+          = FSAL_test_access(context,
+                             access_type,
+                             allowed,
+                             denied,
+                             &entry->attributes);
+     if (use_mutex | !FSAL_IS_ERROR(fsal_status) && attrs) {
+          *attrs = entry->attributes;
+     }
+     if (use_mutex) {
+          PTHREAD_RWLOCK_UNLOCK(&entry->attr_lock);
+     }
 
-          if(FSAL_IS_ERROR(fsal_status)) {
-               *status = cache_inode_error_convert(fsal_status);
-               if (fsal_status.major == ERR_FSAL_STALE) {
-                    LogEvent(COMPONENT_CACHE_INODE,
-                       "STALE returned by FSAL, calling kill_entry");
-                    cache_inode_kill_entry(entry);
-               }
-          } else {
-               *status = CACHE_INODE_SUCCESS;
+     if(FSAL_IS_ERROR(fsal_status)) {
+          *status = cache_inode_error_convert(fsal_status);
+          LogFullDebug(COMPONENT_CACHE_INODE,
+                       "status=%s",
+                       cache_inode_err_str(*status));
+          if (fsal_status.major == ERR_FSAL_STALE) {
+               LogEvent(COMPONENT_CACHE_INODE,
+                  "STALE returned by FSAL, calling kill_entry");
+               cache_inode_kill_entry(entry);
           }
+     } else {
+          *status = CACHE_INODE_SUCCESS;
      }
 
 out:
      return *status;
-}
-
-/**
- *
- * @brief Checks entry permissions without taking a lock
- *
- * This function checks whether the specified permissions are
- * available on the object.  This function may only be called if an
- * attribute lock is held.
- *
- * @param[in]  entry       entry pointer for the fs object to be checked.
- * @param[in]  access_type The kind of access to be checked
- * @param[in]  context     FSAL credentials
- * @param[out] status      Returned status
- *
- * @return CACHE_INODE_SUCCESS if operation is a success
- *
- */
-cache_inode_status_t
-cache_inode_access_no_mutex(cache_entry_t *entry,
-                            fsal_accessflags_t access_type,
-                            fsal_op_context_t *context,
-                            cache_inode_status_t *status)
-{
-    return cache_inode_access_sw(entry, access_type,
-                                 context, status, NULL, FALSE);
-}
-
-/**
- *
- * @brief Checks permissions on an entry
- *
- * This function acquires the attribute lock on the supplied cach
- * entry then checks if the supplied credentials are sufficient to
- * gain the supplied access.
- *
- * @param[in] entry       The object to be checked
- * @param[in] access_type The kind of access to be checked
- * @param[in] context     FSAL credentials
- * @param[in] status      Returned status
- *
- * @return CACHE_INODE_SUCCESS if operation is a success
- */
-cache_inode_status_t
-cache_inode_access(cache_entry_t *entry,
-                   fsal_accessflags_t access_type,
-                   fsal_op_context_t *context,
-                   cache_inode_status_t *status)
-{
-    return cache_inode_access_sw(entry, access_type,
-                                 context, status, NULL, TRUE);
-}
-
-/**
- *
- * @brief Checks permissions on an entry and return attributes
- *
- * Checks for an entry accessibility and return attributes if access is allowed
- *
- * @param[in]  pentry      the fs object to be checked.
- * @param[in]  access_type the kind of access to be c
- * @param[in]  pcontext    FSAL credentials
- * @param[out] attr        pointer to return attributes
- * @param[in]  pstatus     returned status.
- *
- * @return CACHE_INODE_SUCCESS if operation is a success
- *
- */
-cache_inode_status_t
-cache_inode_access2(cache_entry_t * pentry,
-                    fsal_accessflags_t access_type,
-                    fsal_op_context_t * pcontext,
-                    fsal_attrib_list_t *attr,
-                    cache_inode_status_t * pstatus)
-{
-  return cache_inode_access_sw(pentry, access_type,
-                               pcontext, pstatus, attr, TRUE);
 }
 
 int not_in_group_list(gid_t gid, fsal_op_context_t * context)

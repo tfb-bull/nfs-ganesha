@@ -156,6 +156,10 @@ const char *cache_inode_err_str(cache_inode_status_t err)
         return "CACHE_INODE_TOOSMALL";
       case CACHE_INODE_XDEV:
         return "CACHE_INODE_XDEV";
+      case CACHE_INODE_FSAL_SHARE_DENIED:
+        return "CACHE_INODE_FSAL_SHARE_DENIED";  
+      case CACHE_INODE_BADNAME:
+        return "CACHE_INODE_BADNAME";
     }
   return "unknown";
 }
@@ -645,9 +649,11 @@ cache_inode_error_convert(fsal_status_t fsal_status)
       return CACHE_INODE_FSAL_ERROR;
 
     case ERR_FSAL_SYMLINK:
-    case ERR_FSAL_ISDIR:
     case ERR_FSAL_BADTYPE:
       return CACHE_INODE_BAD_TYPE;
+
+    case ERR_FSAL_ISDIR:
+      return CACHE_INODE_IS_A_DIRECTORY;
 
     case ERR_FSAL_FBIG:
       return CACHE_INODE_FILE_BIG;
@@ -665,6 +671,9 @@ cache_inode_error_convert(fsal_status_t fsal_status)
 
     case ERR_FSAL_XDEV:
       return CACHE_INODE_XDEV;
+
+    case ERR_FSAL_SHARE_DENIED:
+      return CACHE_INODE_FSAL_SHARE_DENIED;
 
     case ERR_FSAL_BLOCKED:
     case ERR_FSAL_INTERRUPT:
@@ -744,45 +753,6 @@ cache_inode_fsal_type_convert(fsal_nodetype_t type)
 
   return rctype;
 }                               /* cache_inode_fsal_type_convert */
-
-/**
- * @brief Test if an entry can be overwritten during a rename
- *
- * This function checks if an existing entry can be overwritten by a
- * rename operation.
- *
- * @param[in] src  The source file
- * @param[in] dest The destination file
- *
- * @return TRUE if the rename is allowed, FALSE if not.
- */
-bool_t
-cache_inode_types_are_rename_compatible(cache_entry_t *src,
-                                        cache_entry_t *dest)
-{
-  /* TRUE is both entries are non directories or if both are
-     directories and the second is empty */
-  if(src->type == DIRECTORY)
-    {
-      if(dest->type == DIRECTORY)
-        {
-          if(cache_inode_is_dir_empty(dest) == CACHE_INODE_SUCCESS)
-            return TRUE;
-          else
-            return FALSE;
-        }
-      else
-        return FALSE;
-    }
-  else
-    {
-      /* pentry_src is not a directory */
-      if(dest->type == DIRECTORY)
-        return FALSE;
-      else
-        return TRUE;
-    }
-} /* cache_inode_types_are_rename_compatible */
 
 /**
  *

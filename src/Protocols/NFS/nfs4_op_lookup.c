@@ -87,7 +87,6 @@ int nfs4_op_lookup(struct nfs_argop4 *op, compound_data_t * data, struct nfs_res
   unsigned int           xattr_found = FALSE;
   cache_entry_t        * dir_pentry = NULL;
   cache_entry_t        * file_pentry = NULL;
-  fsal_attrib_list_t     attrlookup;
   cache_inode_status_t   cache_status;
   fsal_handle_t        * pfsal_handle = NULL;
 
@@ -95,7 +94,7 @@ int nfs4_op_lookup(struct nfs_argop4 *op, compound_data_t * data, struct nfs_res
   res_LOOKUP4.status = NFS4_OK;
 
   /* Do basic checks on a filehandle */
-  res_LOOKUP4.status = nfs4_sanity_check_FH(data, 0LL);
+  res_LOOKUP4.status = nfs4_sanity_check_FH(data, DIRECTORY);
   if(res_LOOKUP4.status != NFS4_OK)
     return res_LOOKUP4.status;
 
@@ -169,7 +168,7 @@ int nfs4_op_lookup(struct nfs_argop4 *op, compound_data_t * data, struct nfs_res
   /* BUGAZOMEU: Faire la gestion des cross junction traverse */
   if((file_pentry = cache_inode_lookup(dir_pentry,
                                        &name,
-                                       &attrlookup,
+                                       NULL,
                                        data->pcontext, &cache_status)) != NULL)
     {
       /* Extract the fsal attributes from the cache inode pentry */

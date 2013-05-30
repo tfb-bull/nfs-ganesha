@@ -974,16 +974,11 @@ int fn_fsal_cd(int argc,        /* IN : number of args in argv */
       return ENOTDIR;
     }
 
-  if(FSAL_IS_ERROR(st = FSAL_test_access(&context->context, FSAL_X_OK, &attrs)))
+  if(FSAL_IS_ERROR(st = FSAL_test_access(&context->context, FSAL_X_OK, NULL, NULL, &attrs)))
     {
       fprintf(output, "Error: %s: permission denied.\n", glob_path);
       return st.major;
     }
-
-/*  if (FSAL_IS_ERROR(st = FSAL_access(&new_hdl,&contexte,FSAL_X_OK,&attrs))){
-    fprintf(output,"Error: %s: permission denied.\n",);
-    return st.major;
-  }*/
 
   /* if so, apply changes */
   strncpy(context->current_path, glob_path, FSAL_MAX_PATH_LEN);
@@ -3367,12 +3362,6 @@ int fn_fsal_access(int argc,    /* IN : number of args in argv */
     {
       switch (str_perms[i])
         {
-        case 'F':
-          if(flag_v)
-            fprintf(output, "F_OK flag\n");
-          test_perms |= FSAL_F_OK;
-          break;
-
         case 'R':
           if(flag_v)
             fprintf(output, "R_OK flag\n");
@@ -3431,7 +3420,7 @@ int fn_fsal_access(int argc,    /* IN : number of args in argv */
       if(flag_v)
         fprintf(output, "Testing access rights...\n");
 
-      st = FSAL_test_access(&context->context, test_perms, &attributes);
+      st = FSAL_test_access(&context->context, test_perms, NULL, NULL, &attributes);
 
       if(FSAL_IS_ERROR(st))
         {
@@ -3455,27 +3444,8 @@ int fn_fsal_access(int argc,    /* IN : number of args in argv */
     {
       /* 2nd method: simply calling access */
 
-      if(flag_v)
-        fprintf(output, "Calling access\n");
-
-      st = FSAL_access(&obj_hdl, &context->context, test_perms, NULL);
-
-      if(FSAL_IS_ERROR(st))
-        {
-
-          fprintf(output, "Error executing FSAL_access:");
-          print_fsal_status(output, st);
-          fprintf(output, "\n");
-          return st.major;
-
-        }
-      else
-        {
-
-          fprintf(output, "access: Access granted.\n");
-          return 0;
-        }
-
+      fprintf(output, "Calling access is not supported\n");
+      return -1;
     }
 
 }

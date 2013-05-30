@@ -83,7 +83,7 @@ typedef struct exportlist__        exportlist_t;
 /* FSAL function indexes, and names */
 
 #define INDEX_FSAL_lookup                0
-#define INDEX_FSAL_access                1
+#define INDEX_FSAL_unused_01             1
 #define INDEX_FSAL_create                2
 #define INDEX_FSAL_mkdir                 3
 #define INDEX_FSAL_truncate              4
@@ -125,12 +125,12 @@ typedef struct exportlist__        exportlist_t;
 #define INDEX_FSAL_SetXAttrValue        40
 #define INDEX_FSAL_GetXAttrAttrs        41
 #define INDEX_FSAL_close_by_fileid      42
-#define INDEX_FSAL_setattr_access       43
+#define INDEX_FSAL_unused_43            43
 #define INDEX_FSAL_merge_attrs          44
-#define INDEX_FSAL_rename_access        45
-#define INDEX_FSAL_unlink_access        46
-#define INDEX_FSAL_link_access          47
-#define INDEX_FSAL_create_access        48
+#define INDEX_FSAL_unused_45            45
+#define INDEX_FSAL_unused_46            46
+#define INDEX_FSAL_unused_47            47
+#define INDEX_FSAL_unused_48            48
 #define INDEX_FSAL_unused_49            49
 #define INDEX_FSAL_CleanUpExportContext 50
 #define INDEX_FSAL_getextattrs          51
@@ -619,6 +619,8 @@ typedef fsal_u64_t fsal_attrib_mask_t;
                             FSAL_ATTR_ATIME | FSAL_ATTR_MTIME |   \
                             FSAL_ATTR_CTIME | FSAL_ATTR_SPACEUSED )
 
+#define FSAL_ATTRS_V3 (FSAL_ATTR_TYPE | FSAL_ATTRS_POSIX)
+
 
 /** A list of FS object's attributes. */
 
@@ -669,22 +671,21 @@ typedef struct fsal_extattrib_list__
 
 typedef fsal_uint_t fsal_accessflags_t;
 
-#define FSAL_OWNER_OK   0x08000000       /* Allow owner override */
 #define FSAL_R_OK       0x04000000       /* Test for Read permission */
 #define FSAL_W_OK       0x02000000       /* Test for Write permission */
 #define FSAL_X_OK       0x01000000       /* Test for execute permission */
-#define FSAL_F_OK       0x10000000       /* Test for existence of File */
 #define FSAL_ACCESS_OK  0x00000000       /* Allow */
 
 #define FSAL_ACCESS_FLAG_BIT_MASK  0x80000000
 #define FSAL_MODE_BIT_MASK         0x7F000000
-#define FSAL_ACE4_BIT_MASK         0x00FFFFFF
+#define FSAL_ACE4_BIT_MASK         0x40FFFFFF
 
 #define FSAL_MODE_MASK(access)     (access & FSAL_MODE_BIT_MASK)
 #define FSAL_ACE4_MASK(access)     (access & FSAL_ACE4_BIT_MASK)
 
 #define FSAL_MODE_MASK_FLAG        0x00000000
 #define FSAL_ACE4_MASK_FLAG        0x80000000
+#define FSAL_ACE4_PERM_CONTINUE    0x40000000 /* Indicate ACL evaluation should continue */
 
 #define FSAL_MODE_MASK_SET(access) (access | FSAL_MODE_MASK_FLAG)
 #define FSAL_ACE4_MASK_SET(access) (access | FSAL_ACE4_MASK_FLAG)
@@ -902,9 +903,6 @@ struct fsal_staticfsinfo_t
   fsal_accessmode_t xattr_access_rights;  /**< This indicates who is allowed
                                            *   to read/modify xattrs value.
                                            */
-  fsal_boolean_t accesscheck_support;  /**< This indicates whether access check
-                                       *  will be done in FSAL.
-                                       */
   fsal_boolean_t share_support;        /**< FS supports share reservation? */
   fsal_boolean_t share_support_owner;  /**< FS supports share reservation with open owners ? */
 #ifdef _PNFS_MDS
@@ -977,7 +975,7 @@ typedef struct fs_common_initinfo__
         lock_support_owner, lock_support_async_block,
         named_attr, unique_handles, lease_time, acl_support, cansettime,
         homogenous, supported_attrs, maxread, maxwrite, umask,
-        auth_exportpath_xdev, xattr_access_rights, accesscheck_support,
+        auth_exportpath_xdev, xattr_access_rights,
         share_support, share_support_owner, pnfs_supported,
       fs_layout_types, layout_blksize;
 #else /* !_PNFS_MDS */
@@ -988,7 +986,7 @@ typedef struct fs_common_initinfo__
         lock_support_owner, lock_support_async_block,
         named_attr, unique_handles, lease_time, acl_support, cansettime,
         homogenous, supported_attrs, maxread, maxwrite, umask,
-        auth_exportpath_xdev, xattr_access_rights, accesscheck_support,
+        auth_exportpath_xdev, xattr_access_rights,
         share_support, share_support_owner;
 #endif /* !_PNFS_MDS */
   } behaviors;

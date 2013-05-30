@@ -19,7 +19,6 @@
 #include "FSAL/common_methods.h"
 
 fsal_functions_t fsal_fuse_functions = {
-  .fsal_access = FUSEFSAL_access,
   .fsal_getattrs = FUSEFSAL_getattrs,
   .fsal_setattrs = FUSEFSAL_setattrs,
   .fsal_buildexportcontext = FUSEFSAL_BuildExportContext,
@@ -43,12 +42,7 @@ fsal_functions_t fsal_fuse_functions = {
   .fsal_dynamic_fsinfo = FUSEFSAL_dynamic_fsinfo,
   .fsal_init = FUSEFSAL_Init,
   .fsal_terminate = COMMON_terminate_noerror,
-  .fsal_test_access = FUSEFSAL_test_access,
-  .fsal_setattr_access = COMMON_setattr_access_notsupp,
-  .fsal_rename_access = COMMON_rename_access,
-  .fsal_create_access = COMMON_create_access,
-  .fsal_unlink_access = COMMON_unlink_access,
-  .fsal_link_access = COMMON_link_access,
+  .fsal_test_access = COMMON_test_access,
   .fsal_merge_attrs = COMMON_merge_attrs,
   .fsal_lookup = FUSEFSAL_lookup,
   .fsal_lookuppath = FUSEFSAL_lookupPath,

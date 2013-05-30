@@ -2319,9 +2319,6 @@ int fn_Cache_inode_rename(int argc,     /* IN : number of args in argv */
   char *tgt_path;
   char *tgt_file;
 
-  fsal_attrib_list_t attrsrc;
-  fsal_attrib_list_t attrdest;
-
   cmdCacheInode_thr_info_t *context;
 
   /* is the fs initialized ? */
@@ -2434,8 +2431,6 @@ int fn_Cache_inode_rename(int argc,     /* IN : number of args in argv */
                         &src_name,
                         tgt_path_pentry,
                         &tgt_name,
-                        &attrsrc,
-                        &attrdest,
                         &context->client,
                         &context->context, &context->cache_status) != CACHE_INODE_SUCCESS)
     {
@@ -2902,12 +2897,6 @@ int fn_Cache_inode_access(int argc,     /* IN : number of args in argv */
     {
       switch (str_perms[i])
         {
-        case 'F':
-          if(flag_v)
-            fprintf(output, "F_OK flag\n");
-          test_perms |= FSAL_F_OK;
-          break;
-
         case 'R':
           if(flag_v)
             fprintf(output, "R_OK flag\n");

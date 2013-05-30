@@ -675,7 +675,6 @@ void nfs_set_param_default()
   cache_inode_params.expire_type_attr    = CACHE_INODE_EXPIRE_NEVER;
   cache_inode_params.expire_type_link    = CACHE_INODE_EXPIRE_NEVER;
   cache_inode_params.expire_type_dirent  = CACHE_INODE_EXPIRE_NEVER;
-  cache_inode_params.use_test_access = 1;
   cache_inode_params.getattr_dir_invalidation = 0;
 #ifdef _USE_NFS4_ACL
   cache_inode_params.attrmask = FSAL_ATTR_MASK_V4;
@@ -1873,22 +1872,6 @@ static void nfs_Init(const nfs_start_info_t * p_start_info)
 
   /* Start grace period */
   nfs4_start_grace(NULL);
-
-  /* Set accesscheck_support value to FSAL context object. */
-#ifdef _USE_NFS4_ACL
-  if (!glist_empty(nfs_param.pexportlist))
-    {
-      exportlist_t * pfirst_export;
-      pfirst_export = glist_first_entry(nfs_param.pexportlist,
-                                        exportlist_t,
-                                        exp_list);
-      pfirst_export->FS_export_context
-           .fe_static_fs_info->accesscheck_support
-           = !cache_inode_params.use_test_access;
-      LogDebug(COMPONENT_INIT, "accesscheck_support is set to %d",
-           pfirst_export->FS_export_context.fe_static_fs_info->accesscheck_support);
-    }
-#endif
 
      /* callback dispatch */
      nfs_rpc_cb_pkginit();

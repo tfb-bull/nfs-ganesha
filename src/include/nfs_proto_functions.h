@@ -675,6 +675,12 @@ int nfs4_op_nverify(struct nfs_argop4 *op,      /* [IN] NFS4 OP arguments */
                     compound_data_t * data,     /* [IN] current data for the compound request */
                     struct nfs_resop4 *resp);   /* [OUT] NFS4 OP results */
 
+
+nfsstat4
+nfs4_chk_shrdny(struct nfs_argop4 *op, compound_data_t *data,
+    cache_entry_t *pentry, fsal_accessflags_t rd_acc,
+    bool_t AttrProvided, fsal_attrib_list_t *sattr, struct nfs_resop4 *resop);
+
 int nfs4_op_open(struct nfs_argop4 *op, /* [IN] NFS4 OP arguments */
                  compound_data_t * data,        /* [IN] current data for the compound request */
                  struct nfs_resop4 *resp);      /* [OUT] NFS4 OP results */
@@ -1524,7 +1530,7 @@ int nfs4_PseudoToFattr(pseudofs_entry_t * psfsp,
                        fattr4 * Fattr,
                        compound_data_t * data, nfs_fh4 * objFH, bitmap4 * Bitmap);
 
-int nfs4_PseudoToFhandle(nfs_fh4 * fh4p, pseudofs_entry_t * psfsentry);
+void nfs4_PseudoToFhandle(nfs_fh4 * fh4p, pseudofs_entry_t * psfsentry);
 
 int Fattr4_To_FSAL_attr(fsal_attrib_list_t * pFSAL_attr,    /* Out: File attributes  */
                         fattr4 * Fattr,   /* In: File attributes   */
@@ -1536,7 +1542,7 @@ int nfs4_Fattr_To_FSAL_attr(fsal_attrib_list_t * pFSAL_attr,    /* Out: File att
                             uid_t anon_uid,
                             gid_t anon_gid);
 
-int nfs4_attrmap_to_FSAL_attrmask(bitmap4 attrmap, fsal_attrib_mask_t* attrmask);
+void nfs4_attrmap_to_FSAL_attrmask(bitmap4 * attrmap, fsal_attrib_mask_t* attrmask);
 
 int nfs4_Fattr_Fill(fattr4 *Fattr, int attrcnt, uint32_t *attrlist,
                     int valsiz, char *attrvals);

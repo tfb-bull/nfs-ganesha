@@ -19,7 +19,7 @@
 #include "log.h"
 #include "fsal.h"
 #include "FSAL/common_methods.h"
-
+#include "FSAL/access_check.h"
 
 /* Methods shared by most/all fsals.
  * These are either used in place of or can be called from the fsal specific
@@ -98,164 +98,50 @@ fsal_status_t COMMON_GetClientContext(fsal_op_context_t * p_thr_context,  /* IN/
  */
 
 /**
- * FSAL_test_setattr_access :
- * test if a client identified by cred can access setattr on the object
- * knowing its attributes and parent's attributes.
- * The following fields of the object_attributes structures MUST be filled :
- * acls (if supported), mode, owner, group.
- * This doesn't make any call to the filesystem,
- * as a result, this doesn't ensure that the file exists, nor that
- * the permissions given as parameters are the actual file permissions :
- * this must be ensured by the cache_inode layer, using VFSFSAL_getattrs,
- * for example.
+ * FSAL_test_access :
+ * Tests whether the user or entity identified by its cred
+ * can access the object as indicated by the access_type parameter.
+ * This function tests access rights using cached attributes
+ * given as parameter.
+ * Thus, it cannot test FSAL_F_OK flag, and asking such a flag
+ * will result in a ERR_FSAL_INVAL error.
  *
- * \param cred (in fsal_cred_t *) user's identifier.
- * \param candidate_attrbutes the attributes we want to set on the object
- * \param object_attributes (in fsal_attrib_list_t *) the cached attributes
- *        for the object.
+ * \param cred (input):
+ *        Authentication context for the operation (user,...).
+ * \param access_type (input):
+ *        Indicates the permissions to test.
+ *        This is an inclusive OR of the permissions
+ *        to be checked for the user identified by cred.
+ *        Permissions constants are :
+ *        - FSAL_R_OK : test for read permission
+ *        - FSAL_W_OK : test for write permission
+ *        - FSAL_X_OK : test for exec permission
+ *        - FSAL_F_OK : test for file existence
+ * \param object_attributes (mandatory input):
+ *        The cached attributes for the object to test rights on.
+ *        The following attributes MUST be filled :
+ *        owner, group, mode, ACLs.
  *
  * \return Major error codes :
  *        - ERR_FSAL_NO_ERROR     (no error)
- *        - ERR_FSAL_ACCESS       (Permission denied)
- *        - ERR_FSAL_FAULT        (null pointer parameter)
- *        - ERR_FSAL_INVAL        (missing attributes : mode, group, user,...)
- *        - ERR_FSAL_SERVERFAULT  (unexpected error)
+ *        - Another error code if an error occured.
  */
-fsal_status_t COMMON_setattr_access_notsupp(fsal_op_context_t * p_context,        /* IN */
-                                  fsal_attrib_list_t * candidate_attributes,    /* IN */
-                                  fsal_attrib_list_t * object_attributes        /* IN */
+fsal_status_t COMMON_test_access(fsal_op_context_t  * p_context,   /* IN */
+                                 fsal_accessflags_t   access_type,  /* IN */
+                                 fsal_accessflags_t * allowed,  /* OUT */
+                                 fsal_accessflags_t * denied,  /* OUT */
+                                 fsal_attrib_list_t * p_object_attributes /* IN */
     )
 {
-  Return(ERR_FSAL_NOTSUPP, 0, INDEX_FSAL_setattr_access);
-}                               /* FSAL_test_setattr_access */
-
-/**
- * FSAL_rename_access :
- * test if a client identified by cred can be renamed on the object
- * knowing the parents attributes
- *
- * \param pcontext (in fsal_cred_t *) user's context.
- * \param pattrsrc      source directory attributes
- * \param pattrdest     destination directory attributes
- *
- * \return Major error codes :
- *        - ERR_FSAL_NO_ERROR     (no error)
- *        - ERR_FSAL_ACCESS       (Permission denied)
- *        - ERR_FSAL_FAULT        (null pointer parameter)
- *        - ERR_FSAL_INVAL        (missing attributes : mode, group, user,...)
- *        - ERR_FSAL_SERVERFAULT  (unexpected error)
- */
-
-fsal_status_t COMMON_rename_access(fsal_op_context_t * pcontext,  /* IN */
-                                 fsal_attrib_list_t * pattrsrc, /* IN */
-                                 fsal_attrib_list_t * pattrdest)        /* IN */
-{
-  fsal_status_t fsal_status;
-
-  fsal_status = FSAL_test_access(pcontext, FSAL_W_OK, pattrsrc);
-  if(FSAL_IS_ERROR(fsal_status))
-    Return(fsal_status.major, fsal_status.minor, INDEX_FSAL_rename_access);
-
-  fsal_status = FSAL_test_access(pcontext, FSAL_W_OK, pattrdest);
-  if(FSAL_IS_ERROR(fsal_status))
-    Return(fsal_status.major, fsal_status.minor, INDEX_FSAL_rename_access);
-
-  /* If this point is reached, then access is granted */
-  Return(ERR_FSAL_NO_ERROR, 0, INDEX_FSAL_rename_access);
-}                               /* FSAL_rename_access */
-
-/* Not supported version
- */
-
-fsal_status_t COMMON_rename_access_notsupp(fsal_op_context_t * pcontext,  /* IN */
-                                 fsal_attrib_list_t * pattrsrc, /* IN */
-                                 fsal_attrib_list_t * pattrdest)        /* IN */
-{
-  Return(ERR_FSAL_NOTSUPP, 0, INDEX_FSAL_rename_access);
-}                               /* FSAL_rename_access */
-
-/**
- * FSAL_create_access :
- * test if a client identified by cred can create an object within a directory knowing its attributes
- *
- * \param pcontext (in fsal_cred_t *) user's context.
- * \param pattr      source directory attributes
- *
- * \return Major error codes :
- *        - ERR_FSAL_NO_ERROR     (no error)
- *        - ERR_FSAL_ACCESS       (Permission denied)
- *        - ERR_FSAL_FAULT        (null pointer parameter)
- *        - ERR_FSAL_INVAL        (missing attributes : mode, group, user,...)
- *        - ERR_FSAL_SERVERFAULT  (unexpected error)
- */
-fsal_status_t COMMON_create_access(fsal_op_context_t * pcontext,  /* IN */
-                                 fsal_attrib_list_t * pattr)    /* IN */
-{
-  fsal_status_t fsal_status;
-
-  fsal_status = FSAL_test_access(pcontext, FSAL_W_OK, pattr);
-  if(FSAL_IS_ERROR(fsal_status))
-    Return(fsal_status.major, fsal_status.minor, INDEX_FSAL_create_access);
-
-  /* If this point is reached, then access is granted */
-  Return(ERR_FSAL_NO_ERROR, 0, INDEX_FSAL_create_access);
-}                               /* FSAL_create_access */
-
-/**
- * FSAL_unlink_access :
- * test if a client identified by cred can unlink on a directory knowing its attributes
- *
- * \param pcontext (in fsal_cred_t *) user's context.
- * \param pattr      source directory attributes
- *
- * \return Major error codes :
- *        - ERR_FSAL_NO_ERROR     (no error)
- *        - ERR_FSAL_ACCESS       (Permission denied)
- *        - ERR_FSAL_FAULT        (null pointer parameter)
- *        - ERR_FSAL_INVAL        (missing attributes : mode, group, user,...)
- *        - ERR_FSAL_SERVERFAULT  (unexpected error)
- */
-fsal_status_t COMMON_unlink_access(fsal_op_context_t * pcontext,  /* IN */
-                                 fsal_attrib_list_t * pattr)    /* IN */
-{
-  fsal_status_t fsal_status;
-
-  fsal_status = FSAL_test_access(pcontext, FSAL_W_OK, pattr);
-  if(FSAL_IS_ERROR(fsal_status))
-    Return(fsal_status.major, fsal_status.minor, INDEX_FSAL_unlink_access);
-
-  /* If this point is reached, then access is granted */
-  Return(ERR_FSAL_NO_ERROR, 0, INDEX_FSAL_unlink_access);
-
-}                               /* FSAL_unlink_access */
-
-/**
- * FSAL_link_access :
- * test if a client identified by cred can link to a directory knowing its attributes
- *
- * \param pcontext (in fsal_cred_t *) user's context.
- * \param pattr      destination directory attributes
- *
- * \return Major error codes :
- *        - ERR_FSAL_NO_ERROR     (no error)
- *        - ERR_FSAL_ACCESS       (Permission denied)
- *        - ERR_FSAL_FAULT        (null pointer parameter)
- *        - ERR_FSAL_INVAL        (missing attributes : mode, group, user,...)
- *        - ERR_FSAL_SERVERFAULT  (unexpected error)
- */
-
-fsal_status_t COMMON_link_access(fsal_op_context_t * pcontext,    /* IN */
-                               fsal_attrib_list_t * pattr)      /* IN */
-{
-  fsal_status_t fsal_status;
-
-  fsal_status = FSAL_test_access(pcontext, FSAL_W_OK, pattr);
-  if(FSAL_IS_ERROR(fsal_status))
-    Return(fsal_status.major, fsal_status.minor, INDEX_FSAL_unlink_access);
-
-  /* If this point is reached, then access is granted */
-  Return(ERR_FSAL_NO_ERROR, 0, INDEX_FSAL_link_access);
-}                               /* FSAL_link_access */
+  fsal_status_t status;
+  status = fsal_check_access(p_context,
+                             access_type,
+                             allowed,
+                             denied,
+                             NULL,
+                             p_object_attributes);
+  Return(status.major, status.minor, INDEX_FSAL_test_access);
+}
 
 /**
  * FSAL_merge_attrs: merge to attributes structure.
@@ -670,7 +556,6 @@ fsal_status_t COMMON_SetDefault_FS_common_parameter(fsal_parameter_t * out_param
   FSAL_SET_INIT_DEFAULT(out_parameter->fs_common_info, umask);
   FSAL_SET_INIT_DEFAULT(out_parameter->fs_common_info, auth_exportpath_xdev);
   FSAL_SET_INIT_DEFAULT(out_parameter->fs_common_info, xattr_access_rights);
-  FSAL_SET_INIT_DEFAULT(out_parameter->fs_common_info, accesscheck_support);
   FSAL_SET_INIT_DEFAULT(out_parameter->fs_common_info, share_support);
   FSAL_SET_INIT_DEFAULT(out_parameter->fs_common_info, share_support_owner);
 

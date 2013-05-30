@@ -94,10 +94,6 @@ static inline unsigned long hash_peer(ino_t parent_inode, char *name)
 }
 
 /* All the call to FSAL to be wrapped */
-fsal_status_t FUSEFSAL_access(fsal_handle_t * p_object_handle,      /* IN */
-                              fsal_op_context_t * p_context,        /* IN */
-                              fsal_accessflags_t access_type,   /* IN */
-                              fsal_attrib_list_t * p_object_attributes /* [ IN/OUT ] */ );
 
 fsal_status_t FUSEFSAL_getattrs(fsal_handle_t * p_filehandle,       /* IN */
                                 fsal_op_context_t * p_context,      /* IN */
@@ -206,10 +202,6 @@ fsal_status_t FUSEFSAL_dynamic_fsinfo(fsal_handle_t * p_filehandle, /* IN */
                                       fsal_dynamicfsinfo_t * p_dynamicinfo /* OUT */ );
 
 fsal_status_t FUSEFSAL_Init(fsal_parameter_t * init_info /* IN */ );
-
-fsal_status_t FUSEFSAL_test_access(fsal_op_context_t * p_context,   /* IN */
-                                   fsal_accessflags_t access_type,      /* IN */
-                                   fsal_attrib_list_t * p_object_attributes /* IN */ );
 
 fsal_status_t FUSEFSAL_lookup(fsal_handle_t * p_parent_directory_handle,    /* IN */
                               fsal_name_t * p_filename, /* IN */

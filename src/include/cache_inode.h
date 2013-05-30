@@ -145,7 +145,6 @@ typedef struct cache_inode_parameter__
   time_t grace_period_dirent; /*< Cached dirent grace period */
   bool_t getattr_dir_invalidation; /*< Use getattr as for directory
                                        invalidation */
-  bool_t use_test_access; /*< Is FSAL_test_access to be used? */
   bool_t use_fsal_hash; /*< Do we rely on FSAL to hash handle or not? */
 } cache_inode_parameter_t;
 
@@ -586,6 +585,8 @@ typedef enum cache_inode_status_t
   CACHE_INODE_SERVERFAULT           = 41,
   CACHE_INODE_TOOSMALL              = 42,
   CACHE_INODE_XDEV                  = 43,
+  CACHE_INODE_FSAL_SHARE_DENIED     = 44,
+  CACHE_INODE_BADNAME               = 45,
 } cache_inode_status_t;
 
 /**
@@ -603,8 +604,8 @@ typedef enum cache_inode_status_t
 typedef bool_t(*cache_inode_readdir_cb_t)(
      void *opaque,
      char *name,
-     fsal_handle_t *handle,
-     fsal_attrib_list_t *attrs,
+     cache_entry_t *entry,
+     fsal_op_context_t *context,
      uint64_t cookie);
 
 const char *cache_inode_err_str(cache_inode_status_t err);
@@ -629,25 +630,63 @@ void cache_inode_put(cache_entry_t *entry);
 
 cache_inode_status_t cache_inode_access_sw(cache_entry_t *entry,
                                            fsal_accessflags_t access_type,
+                                           fsal_accessflags_t * allowed,
+                                           fsal_accessflags_t * denied,
                                            fsal_op_context_t *context,
                                            cache_inode_status_t *status,
                                            fsal_attrib_list_t *attrs,
                                            bool_t use_mutex);
-cache_inode_status_t cache_inode_access_no_mutex(
-    cache_entry_t *entry,
-    fsal_accessflags_t access_type,
-    fsal_op_context_t *context,
-    cache_inode_status_t *status);
-cache_inode_status_t cache_inode_access(cache_entry_t *entry,
-                                        fsal_accessflags_t access_type,
-                                        fsal_op_context_t *context,
-                                        cache_inode_status_t *status);
 
-cache_inode_status_t cache_inode_access2(cache_entry_t *entry,
-                                         fsal_accessflags_t access_type,
-                                         fsal_op_context_t *context,
-                                         fsal_attrib_list_t *attrs,
-                                         cache_inode_status_t *status);
+/**
+ *
+ * @brief Checks entry permissions without taking a lock
+ *
+ * This function checks whether the specified permissions are
+ * available on the object.  This function may only be called if an
+ * attribute lock is held.
+ *
+ * @param[in]  entry       entry pointer for the fs object to be checked.
+ * @param[in]  access_type The kind of access to be checked
+ * @param[in]  context     FSAL credentials
+ * @param[out] status      Returned status
+ *
+ * @return CACHE_INODE_SUCCESS if operation is a success
+ *
+ */
+static inline cache_inode_status_t
+cache_inode_access_no_mutex(cache_entry_t *entry,
+                            fsal_accessflags_t access_type,
+                            fsal_op_context_t *context,
+                            cache_inode_status_t *status)
+{
+    return cache_inode_access_sw(entry, access_type, NULL, NULL,
+                                 context, status, NULL, FALSE);
+}
+
+/**
+ *
+ * @brief Checks permissions on an entry
+ *
+ * This function acquires the attribute lock on the supplied cach
+ * entry then checks if the supplied credentials are sufficient to
+ * gain the supplied access.
+ *
+ * @param[in] entry       The object to be checked
+ * @param[in] access_type The kind of access to be checked
+ * @param[in] context     FSAL credentials
+ * @param[in] status      Returned status
+ *
+ * @return CACHE_INODE_SUCCESS if operation is a success
+ */
+static inline cache_inode_status_t
+cache_inode_access(cache_entry_t *entry,
+                   fsal_accessflags_t access_type,
+                   fsal_op_context_t *context,
+                   cache_inode_status_t *status)
+{
+    return cache_inode_access_sw(entry, access_type, NULL, NULL,
+                                 context, status, NULL, TRUE);
+}
 
 cache_inode_status_t
 cache_inode_check_setattr_perms(cache_entry_t        * pentry,
@@ -746,18 +785,10 @@ cache_inode_status_t cache_inode_remove_cached_dirent(
      fsal_name_t *name,
      cache_inode_status_t *status);
 
-cache_inode_status_t cache_inode_rename_cached_dirent(
-     cache_entry_t *entry_parent,
-     fsal_name_t *oldname,
-     fsal_name_t *newname,
-     cache_inode_status_t *status);
-
 cache_inode_status_t cache_inode_rename(cache_entry_t *entry,
                                         fsal_name_t *oldname,
                                         cache_entry_t *entry_dirdest,
                                         fsal_name_t *newname,
-                                        fsal_attrib_list_t *attr_src,
-                                        fsal_attrib_list_t *attr_dst,
                                         fsal_op_context_t *context,
                                         cache_inode_status_t *status);
 
@@ -849,6 +880,7 @@ cache_inode_status_t cache_inode_readdir(cache_entry_t *directory,
                                          unsigned int *nbfound,
                                          bool_t *eod_met,
                                          fsal_op_context_t *context,
+                                         fsal_attrib_mask_t attrmask,
                                          cache_inode_readdir_cb_t cb,
                                          void *cb_opaque,
                                          cache_inode_status_t *status);
@@ -865,18 +897,12 @@ cache_inode_status_t cache_inode_check_trust(cache_entry_t *entry,
 
 cache_inode_file_type_t cache_inode_fsal_type_convert(fsal_nodetype_t type);
 
-int cache_inode_types_are_rename_compatible(cache_entry_t *src,
-                                            cache_entry_t *dest);
-
 void cache_inode_print_dir(cache_entry_t *cache_entry_root);
 
 cache_inode_status_t cache_inode_statfs(cache_entry_t *entry,
                                         fsal_dynamicfsinfo_t *dynamicinfo,
                                         fsal_op_context_t *context,
                                         cache_inode_status_t *status);
-
-cache_inode_status_t cache_inode_is_dir_empty(cache_entry_t *entry);
-cache_inode_status_t cache_inode_is_dir_empty_WithLock(cache_entry_t *entry);
 
 cache_inode_status_t cache_inode_invalidate_all_cached_dirent(
      cache_entry_t *entry,
@@ -1020,19 +1046,27 @@ out:
 }
 
 /**
- * @brief Return a changeid4 for this entry.
+ * @brief Reload attributes from the FSAL.
  *
- * This function returns a changeid4 for the supplied entry.  It
- * should ONLY be used for populating change_info4 structures.
+ * Load the FSAL attributes as specified in the configuration into
+ * this entry, mark them as trustable and update the entry metadata.
  *
- * @param[in] entry The entry to query.
- * @return A changeid4 indicating the last modification of the entry.
+ * @param[in,out] entry   The entry to be refreshed
+ * @param[in]     context FSAL operation context
  */
-
-static inline changeid4
-cache_inode_get_changeid4(cache_entry_t *entry)
+static inline cache_inode_status_t cache_inode_refresh_attrs_locked(
+        cache_entry_t *entry,
+        fsal_op_context_t *context)
 {
-     return (changeid4) entry->change_time;
+        cache_inode_status_t status;
+
+        PTHREAD_RWLOCK_WRLOCK(&entry->attr_lock);
+
+        status = cache_inode_refresh_attrs(entry, context);
+
+        PTHREAD_RWLOCK_UNLOCK(&entry->attr_lock);
+
+        return status;
 }
 
 /**
@@ -1096,6 +1130,32 @@ cache_inode_lock_trust_attrs(cache_entry_t *entry,
      }
 
      return cache_status;
+}
+
+/**
+ * @brief Return a changeid4 for this entry.
+ *
+ * This function returns a changeid4 for the supplied entry.  It
+ * should ONLY be used for populating change_info4 structures.
+ *
+ * @param[in,out] entry   The entry to query.
+ * @param[in]     context The FSAL operation context
+ * @return A changeid4 indicating the last modification of the entry.
+ */
+
+static inline changeid4
+cache_inode_get_changeid4(cache_entry_t *entry, fsal_op_context_t *context)
+{
+     cache_inode_status_t status;
+     changeid4 changeid;
+     status = cache_inode_lock_trust_attrs(entry, context, FALSE);
+
+     changeid = (changeid4) entry->change_time;
+
+     if(status == CACHE_INODE_SUCCESS)
+       PTHREAD_RWLOCK_UNLOCK(&entry->attr_lock);
+
+     return changeid;
 }
 
 #endif /*  _CACHE_INODE_H */

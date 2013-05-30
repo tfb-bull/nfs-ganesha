@@ -7,7 +7,7 @@ if USE_PNFS
 noinst_LTLIBRARIES += libfsalpnfsceph.la
 endif
 
-libfsalceph_la_SOURCES = fsal_access.c  \
+libfsalceph_la_SOURCES = \
                         fsal_context.c  \
                         fsal_compat.c   \
                         fsal_dirs.c     \
@@ -33,7 +33,6 @@ libfsalceph_la_SOURCES = fsal_access.c  \
                         fsal_stats.c    \
                         fsal_tools.c    \
                         fsal_xattrs.c   \
-                        fsal_local_op.c \
 			fsal_internal.h \
                         fsal_convert.h  \
                         fsal_xattrs.c   \

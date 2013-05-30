@@ -17,7 +17,6 @@
 #include "FSAL/common_methods.h"
 
 fsal_functions_t fsal_vfs_functions = {
-  .fsal_access = VFSFSAL_access,
   .fsal_getattrs = VFSFSAL_getattrs,
   .fsal_getattrs_descriptor = VFSFSAL_getattrs_descriptor,
   .fsal_setattrs = VFSFSAL_setattrs,
@@ -43,12 +42,7 @@ fsal_functions_t fsal_vfs_functions = {
   .fsal_dynamic_fsinfo = VFSFSAL_dynamic_fsinfo,
   .fsal_init = VFSFSAL_Init,
   .fsal_terminate = COMMON_terminate_noerror,
-  .fsal_test_access = VFSFSAL_test_access,
-  .fsal_setattr_access = COMMON_setattr_access_notsupp,
-  .fsal_rename_access = COMMON_rename_access,
-  .fsal_create_access = COMMON_create_access,
-  .fsal_unlink_access = COMMON_unlink_access,
-  .fsal_link_access = COMMON_link_access,
+  .fsal_test_access = COMMON_test_access,
   .fsal_merge_attrs = COMMON_merge_attrs,
   .fsal_lookup = VFSFSAL_lookup,
   .fsal_lookuppath = VFSFSAL_lookupPath,

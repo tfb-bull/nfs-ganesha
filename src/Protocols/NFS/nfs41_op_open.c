@@ -78,9 +78,6 @@ int nfs41_op_open(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
   cache_entry_t           * pentry_lookup = NULL;
   cache_entry_t           * pentry_newfile = NULL;
   fsal_handle_t           * pnewfsal_handle = NULL;
-  fsal_attrib_list_t        attr_parent;
-  fsal_attrib_list_t        attr;
-  fsal_attrib_list_t        attr_newfile;
   fsal_attrib_list_t        sattr;
   fsal_openflags_t          openflags = 0;
   cache_inode_status_t      cache_status = CACHE_INODE_SUCCESS;
@@ -102,6 +99,7 @@ int nfs41_op_open(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
   const char              * cause = "OOPS";
   const char              * cause2 = "";
   struct glist_head       * glist;
+  nfsstat4                  status4;
 #ifdef _USE_QUOTA
   fsal_status_t            fsal_status ;
 #endif
@@ -111,9 +109,6 @@ int nfs41_op_open(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
 
   newfh4.nfs_fh4_val = (caddr_t) &new_handle;
   newfh4.nfs_fh4_len = sizeof(struct alloc_file_handle_v4);
-
-  fsal_accessflags_t write_access = FSAL_WRITE_ACCESS;
-  fsal_accessflags_t read_access = FSAL_READ_ACCESS;
 
   resp->resop = NFS4_OP_OPEN;
   res_OPEN4.status = NFS4_OK;
@@ -159,6 +154,17 @@ int nfs41_op_open(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
   if(res_OPEN4.status != NFS4_OK)
     goto out;
 
+  if(nfs4_Is_Fh_Pseudo(&(data->currentFH)))
+    {
+      res_OPEN4.status = NFS4ERR_PERM;
+
+      LogDebug(COMPONENT_NFS_V4,
+               "Status of OP_OPEN due to PseudoFS handle = %s",
+               nfsstat4_to_str(res_OPEN4.status));
+
+      return res_OPEN4.status;
+    }
+
   /* If Filehandle points to a xattr object, manage it via the xattrs specific functions */
   if(nfs4_Is_Fh_Xattr(&(data->currentFH))) {
     res_OPEN4.status = nfs4_op_open_xattr(op, data, resp);
@@ -175,13 +181,14 @@ int nfs41_op_open(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
                                                    NULL,
                                                    NULL,
                                                    &(res_OPEN4.status),
-                                                   &attr,
+                                                   NULL,
                                                    data->pcontext,
                                                    &retval)) == NULL)
         {
-          res_OPEN4.status = NFS4ERR_RESOURCE;
-          LogDebug(COMPONENT_STATE,
-                   "NFS41 OPEN returning NFS4ERR_RESOURCE after trying to repopulate cache");
+          LogCrit(COMPONENT_STATE,
+                   "NFS41 OPEN returning %s after "
+                   "trying to repopulate cache",
+                   nfsstat4_to_str(res_OPEN4.status));
           goto out;
         }
     }
@@ -304,19 +311,9 @@ int nfs41_op_open(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
           goto out;
         }
 
-      /* Status of parent directory before the operation */
-      if(cache_inode_getattr(pentry_parent,
-                             &attr_parent,
-                             data->pcontext,
-                             &cache_status) != CACHE_INODE_SUCCESS)
-        {
-          res_OPEN4.status = nfs4_Errno(cache_status);
-          cause2 = " cache_inode_getattr";
-          goto out;
-        }
-
+      /* Generate change info for before */
       res_OPEN4.OPEN4res_u.resok4.cinfo.before
-           = cache_inode_get_changeid4(pentry_parent);
+           = cache_inode_get_changeid4(pentry_parent, data->pcontext);
 
       /* CLient may have provided fattr4 to set attributes at creation time */
       if(arg_OPEN4.openhow.openflag4_u.how.mode == GUARDED4 ||
@@ -368,7 +365,7 @@ int nfs41_op_open(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
           /* Does a file with this name already exist ? */
           pentry_lookup = cache_inode_lookup(pentry_parent,
                                              &filename,
-                                             &attr_newfile,
+                                             NULL,
                                              data->pcontext,
                                              &cache_status);
 
@@ -378,75 +375,17 @@ int nfs41_op_open(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
               if(arg_OPEN4.openhow.openflag4_u.how.mode == UNCHECKED4
                  && (cache_status == CACHE_INODE_SUCCESS))
                 {
-                  /* If the file is opened for write, OPEN4 while deny share write access,
-                   * in this case, check caller has write access to the file */
-                  if(arg_OPEN4.share_deny & OPEN4_SHARE_DENY_WRITE)
+                  /* Check permissions on file and set attrs */
+                  status4 = nfs4_chk_shrdny(op, data, pentry_lookup,
+                      openflags, AttrProvided,
+                      &sattr, resp);
+                  if (status4 != NFS4_OK)
                     {
-                      if(cache_inode_access(pentry_lookup,
-                                            write_access,
-                                            data->pcontext,
-                                            &cache_status) != CACHE_INODE_SUCCESS)
-                        {
-                          res_OPEN4.status = nfs4_Errno(cache_status);
-                          goto out;
-                        }
-                      openflags = FSAL_O_WRONLY;
-                    }
-
-                  /* Same check on read: check for readability of a file before opening it for read */
-                  if(arg_OPEN4.share_access & OPEN4_SHARE_ACCESS_READ)
-                    {
-                      if(cache_inode_access(pentry_lookup,
-                                            read_access,
-                                            data->pcontext,
-                                            &cache_status) != CACHE_INODE_SUCCESS)
-                        {
-                          res_OPEN4.status = nfs4_Errno(cache_status);
-                          goto out;
-                        }
-                      openflags = FSAL_O_RDONLY;
-                    }
-
-                  if(AttrProvided == TRUE)      /* Set the attribute if provided */
-                    {
-                      /* If owner or owner_group are set, and the credential was
-                       * squashed, then we must squash the set owner and owner_group.
-                       */
-                      squash_setattr(&data->export_perms,
-                                     &data->pworker->user_credentials,
-                                     &sattr);
-
-                      if(cache_inode_setattr(pentry_lookup,
-                                             &sattr,
-                                             data->pcontext,
-                                             (arg_OPEN4.share_access & OPEN4_SHARE_ACCESS_WRITE) != 0,
-                                             &cache_status) != CACHE_INODE_SUCCESS)
-                        {
-                          res_OPEN4.status = nfs4_Errno(cache_status);
-                          cause2 = " cache_inode_setattr";
-                          goto out;
-                        }
-
-                      res_OPEN4.OPEN4res_u.resok4.attrset =
-                          arg_OPEN4.openhow.openflag4_u.how.createhow4_u.createattrs.
-                          attrmask;
-                    }
-                  else
-                    res_OPEN4.OPEN4res_u.resok4.attrset.bitmap4_len = 0;
-
-                  /* Same check on write */
-                  if(arg_OPEN4.share_access & OPEN4_SHARE_ACCESS_WRITE)
-                    {
-                      if(cache_inode_access(pentry_lookup,
-                                            write_access,
-                                            data->pcontext,
-                                            &cache_status) != CACHE_INODE_SUCCESS)
-                        {
-                          res_OPEN4.status = nfs4_Errno(cache_status);
-                          cause2 = " cache_inode_access";
-                          goto out;
-                        }
-                      openflags = FSAL_O_RDWR;
+                      PTHREAD_RWLOCK_UNLOCK(&pentry_lookup->state_lock);
+                      cause2 = " cache_inode_access";
+                      res_OPEN4.status = status4;
+                      cache_inode_put(pentry_lookup);
+                      goto out;
                     }
 
                   /* Set the state for the related file */
@@ -506,8 +445,9 @@ int nfs41_op_open(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
                       goto out;
                     }
 
+                  /* Generate change info for after */
                   res_OPEN4.OPEN4res_u.resok4.cinfo.after
-                       = cache_inode_get_changeid4(pentry_parent);
+                       = cache_inode_get_changeid4(pentry_parent, data->pcontext);
                   res_OPEN4.OPEN4res_u.resok4.cinfo.atomic = FALSE;
 
                   /* No delegation */
@@ -576,10 +516,9 @@ int nfs41_op_open(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
                             {
 
                               /* A former open EXCLUSIVE with same owner and verifier was found, resend it */
-                              memset(&(res_OPEN4.OPEN4res_u.resok4.cinfo.after), 0,
-                                     sizeof(changeid4));
+                              /* Generate change info for after */
                               res_OPEN4.OPEN4res_u.resok4.cinfo.after =
-                                   cache_inode_get_changeid4(pentry_parent);
+                                   cache_inode_get_changeid4(pentry_parent, data->pcontext);
                               res_OPEN4.OPEN4res_u.resok4.cinfo.atomic = FALSE;
 
                               /* No delegation */
@@ -654,7 +593,7 @@ int nfs41_op_open(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
                                                   REGULAR_FILE,
                                                   mode,
                                                   &create_arg,
-                                                  &attr_newfile,
+                                                  NULL,
                                                   data->pcontext, &cache_status)) == NULL)
             {
               /* If the file already exists, this is not an error if open mode is UNCHECKED */
@@ -775,7 +714,7 @@ int nfs41_op_open(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
             {
               if((pentry_newfile = cache_inode_lookup(pentry_parent,
                                                       &filename,
-                                                      &attr_newfile,
+                                                      NULL,
                                                       data->pcontext,
                                                       &cache_status)) == NULL)
                 {
@@ -806,47 +745,14 @@ int nfs41_op_open(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
                 }
             }
 
-          /* If the file is opened for write, OPEN4 while deny share write access,
-           * in this case, check caller has write access to the file */
-          if(arg_OPEN4.share_deny & OPEN4_SHARE_DENY_WRITE)
+          status4 = nfs4_chk_shrdny(op, data, pentry_newfile,
+              openflags, FALSE, NULL, resp);
+          if (status4 != NFS4_OK)
             {
-              if(cache_inode_access(pentry_newfile,
-                                    write_access,
-                                    data->pcontext, &cache_status) != CACHE_INODE_SUCCESS)
-                {
-                  res_OPEN4.status = nfs4_Errno(cache_status);
-                  cause2 = " OPEN4_SHARE_DENY_WRITE cache_inode_access";
-                  goto out;
-                }
-              openflags = FSAL_O_WRONLY;
-            }
-
-          /* Same check on read: check for readability of a file before opening it for read */
-          if(arg_OPEN4.share_access & OPEN4_SHARE_ACCESS_READ)
-            {
-              if(cache_inode_access(pentry_newfile,
-                                    read_access,
-                                    data->pcontext, &cache_status) != CACHE_INODE_SUCCESS)
-                {
-                  res_OPEN4.status = nfs4_Errno(cache_status);
-                  cause2 = " OPEN4_SHARE_ACCESS_READ cache_inode_access";
-                  goto out;
-                }
-              openflags = FSAL_O_RDONLY;
-            }
-
-          /* Same check on write */
-          if(arg_OPEN4.share_access & OPEN4_SHARE_ACCESS_WRITE)
-            {
-              if(cache_inode_access(pentry_newfile,
-                                    write_access,
-                                    data->pcontext, &cache_status) != CACHE_INODE_SUCCESS)
-                {
-                  res_OPEN4.status = nfs4_Errno(cache_status);
-                  cause2 = " OPEN4_SHARE_ACCESS_WRITE cache_inode_access";
-                  goto out;
-                }
-              openflags = FSAL_O_RDWR;
+              cause2 = " cache_inode_access";
+              res_OPEN4.status = status4;
+              cache_inode_put(pentry_newfile);
+              goto out;
             }
 
           /* Try to find if the same open_owner already has acquired a
@@ -1027,17 +933,6 @@ int nfs41_op_open(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
 
   data->current_filetype = REGULAR_FILE;
 
-  /* Status of parent directory after the operation */
-  if((cache_status = cache_inode_getattr(pentry_parent,
-                                         &attr_parent,
-                                         data->pcontext,
-                                         &cache_status)) != CACHE_INODE_SUCCESS)
-    {
-      res_OPEN4.status = nfs4_Errno(cache_status);
-      cause2 = " cache_inode_getattr";
-      goto out;
-    }
-
   res_OPEN4.OPEN4res_u.resok4.attrset.bitmap4_len = 3;
   if((res_OPEN4.OPEN4res_u.resok4.attrset.bitmap4_val =
       gsh_calloc(res_OPEN4.OPEN4res_u.resok4.attrset.bitmap4_len,
@@ -1056,8 +951,9 @@ int nfs41_op_open(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
       nfs4_list_to_bitmap4(&(res_OPEN4.OPEN4res_u.resok4.attrset), 2, tmp_attr);
     }
 
+  /* Generate change info for after */
   res_OPEN4.OPEN4res_u.resok4.cinfo.after
-       = cache_inode_get_changeid4(pentry_parent);
+       = cache_inode_get_changeid4(pentry_parent, data->pcontext);
   res_OPEN4.OPEN4res_u.resok4.cinfo.atomic = FALSE;
 
   /* No delegation */
