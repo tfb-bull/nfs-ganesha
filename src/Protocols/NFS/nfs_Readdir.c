@@ -70,11 +70,13 @@
 static bool_t nfs2_readdir_callback(void* opaque,
                                     char *name,
                                     cache_entry_t *entry,
+                                    bool_t attr_allowed,
                                     fsal_op_context_t *context,
                                     uint64_t cookie);
 static bool_t nfs3_readdir_callback(void* opaque,
                                     char *name,
                                     cache_entry_t *entry,
+                                    bool_t attr_allowed,
                                     fsal_op_context_t *context,
                                     uint64_t cookie);
 static void free_entry2s(entry2 *entry2s);
@@ -268,9 +270,9 @@ nfs_Readdir(nfs_arg_t *arg,
           cbfunc = nfs2_readdir_callback;
           cbdata = &cb2;
      } else {
-          count = (arg->arg_readdir3.count * 9 / 10);
+          count = arg->arg_readdir3.count;
           cookie = arg->arg_readdir3.cookie;
-          estimated_num_entries = MIN(count / sizeof(entry3), 50);
+          estimated_num_entries = MIN(count / (sizeof(entry3)-sizeof(char *)), 120);
           LogFullDebug(COMPONENT_NFS_READDIR,
                        "---> nfs3_Readdir: count=%lu  cookie=%"PRIu64"  "
                        "estimated_num_entries=%lu",
@@ -336,6 +338,7 @@ nfs_Readdir(nfs_arg_t *arg,
           if (!cbfunc(cbdata,
                       ".",
                       dir_entry,
+                      TRUE,
                       context,
                       1))
                 goto outerr;
@@ -359,6 +362,9 @@ nfs_Readdir(nfs_arg_t *arg,
                rc = NFS_REQ_OK;
                goto out;
           }
+
+          parent_dir_attr.asked_attributes = FSAL_ATTRS_V3;
+
           if ((cache_inode_getattr(parent_dir_entry,
                                    &parent_dir_attr,
                                    context,
@@ -377,6 +383,7 @@ nfs_Readdir(nfs_arg_t *arg,
           if (!cbfunc(cbdata,
                       "..",
                       parent_dir_entry,
+                      TRUE,
                       context,
                       2))
                 goto outerr;
@@ -525,6 +532,7 @@ static bool_t
 nfs2_readdir_callback(void* opaque,
                       char *name,
                       cache_entry_t *entry,
+                      bool_t attr_allowed,
                       fsal_op_context_t *context,
                       uint64_t cookie)
 {
@@ -594,6 +602,7 @@ static bool_t
 nfs3_readdir_callback(void* opaque,
                       char *name,
                       cache_entry_t *entry,
+                      bool_t attr_allowed,
                       fsal_op_context_t *context,
                       uint64_t cookie)
 {
@@ -606,7 +615,8 @@ nfs3_readdir_callback(void* opaque,
      /* Fileid descriptor */
      struct fsal_handle_desc id_descriptor
           = {sizeof(e3->fileid), (caddr_t) &e3->fileid};
-     size_t need = sizeof(entry3) + ((namelen + 3) & ~3) + 4;
+     size_t need = sizeof(entry3) + ((namelen + 3) & ~3) + 4
+       - sizeof(char *) - sizeof(entry3 *);
 
      if (tracker->count == tracker->total_entries) {
           return FALSE;
@@ -617,6 +627,7 @@ nfs3_readdir_callback(void* opaque,
           }
           return FALSE;
      }
+     /* We must always return fileid even if attr are not allowed. */
      if(entry != NULL) {
           FSAL_DigestHandle(FSAL_GET_EXP_CTX(tracker->context),
                             FSAL_DIGEST_FILEID3,

@@ -2454,14 +2454,15 @@ int nfs3_FSALattr_To_Fattr(exportlist_t * pexport,      /* In: the related expor
                                     Fattr))
     return 0;
 
-  /* in NFSv3, we only keeps fsid.major, casted into an nfs_uint64 */
-  Fattr->fsid = (nfs3_uint64) pexport->filesystem_id.major;
+  /* xor filesystem_id major and rotated minor to create unique on-wire fsid.*/ 
+  Fattr->fsid = (nfs3_uint64) (pexport->filesystem_id.major ^
+                               (pexport->filesystem_id.minor << 32 |
+                                pexport->filesystem_id.minor >> 32));
   LogFullDebug(COMPONENT_NFSPROTO,
-               "%s: fsid.major = %#llX (%llu), fsid.minor = %#llX (%llu), nfs3_fsid = %#llX (%llu)",
-               __func__,
+               "fsid.major = %#llX (%llu), fsid.minor = %#llX (%llu), nfs3_fsid = %#llX (%llu)",
                pexport->filesystem_id.major, pexport->filesystem_id.major,
-               pexport->filesystem_id.minor, pexport->filesystem_id.minor, Fattr->fsid,
-               Fattr->fsid);
+               pexport->filesystem_id.minor, pexport->filesystem_id.minor,
+               Fattr->fsid, Fattr->fsid);
   return 1;
 }
 
@@ -3275,8 +3276,7 @@ void nfs4_attrmap_to_FSAL_attrmask(bitmap4 * attrmap, fsal_attrib_mask_t* attrma
                 break;
               case FATTR4_FILEHANDLE:
                 LogFullDebug(COMPONENT_NFS_V4,
-                             "Filehandle attribute requested on readdir!");
-                /* pFSAL_attr->asked_attributes |= FSAL_ATTR_FILEHANDLE; */
+                             "Filehandle attribute requested");
                 break;
 #ifdef _USE_NFS4_ACL
               case FATTR4_ACL:
@@ -4331,18 +4331,20 @@ void nfs_access_op(cache_entry_t *entry,
 {
   fsal_accessflags_t access_mask;
   fsal_accessflags_t access_allowed;
+  fsal_accessflags_t access_denied;
   uint32_t           granted_mask = requested_access;
   
   access_mask = 0;
   *granted_access = 0;
 
-  LogDebug(COMPONENT_NFSPROTO, "Requested ACCESS=%s,%s,%s,%s,%s,%s",
-           FSAL_TEST_MASK(requested_access, ACCESS3_READ) ? "READ" : "-",
-           FSAL_TEST_MASK(requested_access, ACCESS3_LOOKUP) ? "LOOKUP" : "-",
-           FSAL_TEST_MASK(requested_access, ACCESS3_MODIFY) ? "MODIFY" : "-",
-           FSAL_TEST_MASK(requested_access, ACCESS3_EXTEND) ? "EXTEND" : "-",
-           FSAL_TEST_MASK(requested_access, ACCESS3_DELETE) ? "DELETE" : "-",
-           FSAL_TEST_MASK(requested_access, ACCESS3_EXECUTE) ? "EXECUTE" : "-");
+  LogDebugAlt(COMPONENT_NFSPROTO, COMPONENT_NFS_V4_ACL,
+              "Requested ACCESS=%s,%s,%s,%s,%s,%s",
+              FSAL_TEST_MASK(requested_access, ACCESS3_READ) ? "READ" : "-",
+              FSAL_TEST_MASK(requested_access, ACCESS3_LOOKUP) ? "LOOKUP" : "-",
+              FSAL_TEST_MASK(requested_access, ACCESS3_MODIFY) ? "MODIFY" : "-",
+              FSAL_TEST_MASK(requested_access, ACCESS3_EXTEND) ? "EXTEND" : "-",
+              FSAL_TEST_MASK(requested_access, ACCESS3_DELETE) ? "DELETE" : "-",
+              FSAL_TEST_MASK(requested_access, ACCESS3_EXECUTE) ? "EXECUTE" : "-");
 
   /* Set mode for read.
    * NOTE: FSAL_ACE_PERM_LIST_DIR and FSAL_ACE_PERM_READ_DATA have the same
@@ -4405,24 +4407,25 @@ void nfs_access_op(cache_entry_t *entry,
                    FSAL_ACE4_MASK_FLAG |
                    FSAL_ACE4_PERM_CONTINUE;
 
-  LogDebug(COMPONENT_NFSPROTO, "access_mask = mode(%c%c%c) ACL(%s,%s,%s,%s,%s)",
-           FSAL_TEST_MASK(access_mask, FSAL_R_OK) ? 'r' : '-',
-           FSAL_TEST_MASK(access_mask, FSAL_W_OK) ? 'w' : '-',
-           FSAL_TEST_MASK(access_mask, FSAL_X_OK) ? 'x' : '-',
-           FSAL_TEST_MASK(access_mask, FSAL_ACE_PERM_READ_DATA) ?
-              entry->type == DIRECTORY ? "list_dir":"read_data"
-              :"-",
-           FSAL_TEST_MASK(access_mask, FSAL_ACE_PERM_WRITE_DATA) ?
-              entry->type == DIRECTORY ? "add_file" : "write_data"
-              :"-",
-           FSAL_TEST_MASK(access_mask, FSAL_ACE_PERM_EXECUTE)            ? "execute":"-",
-           FSAL_TEST_MASK(access_mask, FSAL_ACE_PERM_ADD_SUBDIRECTORY)   ? "add_subdirectory":"-",
-           FSAL_TEST_MASK(access_mask, FSAL_ACE_PERM_DELETE_CHILD)       ? "delete_child":"-");
+  LogDebugAlt(COMPONENT_NFSPROTO, COMPONENT_NFS_V4_ACL,
+              "access_mask = mode(%c%c%c) ACL(%s,%s,%s,%s,%s)",
+              FSAL_TEST_MASK(access_mask, FSAL_R_OK) ? 'r' : '-',
+              FSAL_TEST_MASK(access_mask, FSAL_W_OK) ? 'w' : '-',
+              FSAL_TEST_MASK(access_mask, FSAL_X_OK) ? 'x' : '-',
+              FSAL_TEST_MASK(access_mask, FSAL_ACE_PERM_READ_DATA) ?
+                 entry->type == DIRECTORY ? "list_dir":"read_data"
+                 :"-",
+              FSAL_TEST_MASK(access_mask, FSAL_ACE_PERM_WRITE_DATA) ?
+                 entry->type == DIRECTORY ? "add_file" : "write_data"
+                 :"-",
+              FSAL_TEST_MASK(access_mask, FSAL_ACE_PERM_EXECUTE)            ? "execute":"-",
+              FSAL_TEST_MASK(access_mask, FSAL_ACE_PERM_ADD_SUBDIRECTORY)   ? "add_subdirectory":"-",
+              FSAL_TEST_MASK(access_mask, FSAL_ACE_PERM_DELETE_CHILD)       ? "delete_child":"-");
 
   (void) cache_inode_access_sw(entry,
                                access_mask,
                                &access_allowed,
-                               NULL,
+                               &access_denied,
                                context,
                                status,
                                attrs,
@@ -4481,21 +4484,23 @@ void nfs_access_op(cache_entry_t *entry,
       if(supported_access != NULL)
         *supported_access = granted_mask;
 
-      LogDebug(COMPONENT_NFSPROTO, "Supported ACCESS=%s,%s,%s,%s,%s,%s",
-               FSAL_TEST_MASK(granted_mask, ACCESS3_READ) ? "READ" : "-",
-               FSAL_TEST_MASK(granted_mask, ACCESS3_LOOKUP) ? "LOOKUP" : "-",
-               FSAL_TEST_MASK(granted_mask, ACCESS3_MODIFY) ? "MODIFY" : "-",
-               FSAL_TEST_MASK(granted_mask, ACCESS3_EXTEND) ? "EXTEND" : "-",
-               FSAL_TEST_MASK(granted_mask, ACCESS3_DELETE) ? "DELETE" : "-",
-               FSAL_TEST_MASK(granted_mask, ACCESS3_EXECUTE) ? "EXECUTE" : "-");
+      LogDebugAlt(COMPONENT_NFSPROTO, COMPONENT_NFS_V4_ACL,
+                  "Supported ACCESS=%s,%s,%s,%s,%s,%s",
+                  FSAL_TEST_MASK(granted_mask, ACCESS3_READ) ? "READ" : "-",
+                  FSAL_TEST_MASK(granted_mask, ACCESS3_LOOKUP) ? "LOOKUP" : "-",
+                  FSAL_TEST_MASK(granted_mask, ACCESS3_MODIFY) ? "MODIFY" : "-",
+                  FSAL_TEST_MASK(granted_mask, ACCESS3_EXTEND) ? "EXTEND" : "-",
+                  FSAL_TEST_MASK(granted_mask, ACCESS3_DELETE) ? "DELETE" : "-",
+                  FSAL_TEST_MASK(granted_mask, ACCESS3_EXECUTE) ? "EXECUTE" : "-");
 
-      LogDebug(COMPONENT_NFSPROTO, "Granted ACCESS=%s,%s,%s,%s,%s,%s",
-               FSAL_TEST_MASK(*supported_access, ACCESS3_READ) ? "READ" : "-",
-               FSAL_TEST_MASK(*supported_access, ACCESS3_LOOKUP) ? "LOOKUP" : "-",
-               FSAL_TEST_MASK(*supported_access, ACCESS3_MODIFY) ? "MODIFY" : "-",
-               FSAL_TEST_MASK(*supported_access, ACCESS3_EXTEND) ? "EXTEND" : "-",
-               FSAL_TEST_MASK(*supported_access, ACCESS3_DELETE) ? "DELETE" : "-",
-               FSAL_TEST_MASK(*supported_access, ACCESS3_EXECUTE) ? "EXECUTE" : "-");
+      LogDebugAlt(COMPONENT_NFSPROTO, COMPONENT_NFS_V4_ACL,
+                  "Granted ACCESS=%s,%s,%s,%s,%s,%s",
+                  FSAL_TEST_MASK(*granted_access, ACCESS3_READ) ? "READ" : "-",
+                  FSAL_TEST_MASK(*granted_access, ACCESS3_LOOKUP) ? "LOOKUP" : "-",
+                  FSAL_TEST_MASK(*granted_access, ACCESS3_MODIFY) ? "MODIFY" : "-",
+                  FSAL_TEST_MASK(*granted_access, ACCESS3_EXTEND) ? "EXTEND" : "-",
+                  FSAL_TEST_MASK(*granted_access, ACCESS3_DELETE) ? "DELETE" : "-",
+                  FSAL_TEST_MASK(*granted_access, ACCESS3_EXECUTE) ? "EXECUTE" : "-");
     }
 }
 

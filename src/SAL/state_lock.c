@@ -753,7 +753,6 @@ static void merge_lock_entry(cache_entry_t        * pentry,
               check_entry_right->sle_lock.lock_start  = lock_entry_end + 1;
               check_entry_right->sle_lock.lock_length = check_entry_end - lock_entry_end;
               LogEntry("Merge shrunk right", check_entry_right);
-              continue;
             }
           if(check_entry->sle_lock.lock_start < lock_entry->sle_lock.lock_start)
             {
@@ -761,7 +760,6 @@ static void merge_lock_entry(cache_entry_t        * pentry,
               LogEntry("Merge shrinking left", check_entry);
               check_entry->sle_lock.lock_length = lock_entry->sle_lock.lock_start - check_entry->sle_lock.lock_start;
               LogEntry("Merge shrunk left", check_entry);
-              continue;
             }
           /* Done splitting/shrinking old lock */
           continue;
@@ -3141,6 +3139,7 @@ void state_lock_wipe(cache_entry_t        * pentry)
   cache_inode_dec_pin_ref(pentry, FALSE);
 }
 
+#ifdef _USE_NLM
 void cancel_all_nlm_blocked()
 {
   struct glist_head *glist, *glistn;
@@ -3216,3 +3215,4 @@ void cancel_all_nlm_blocked()
     V(blocked_locks_mutex);
     return;
 }
+#endif

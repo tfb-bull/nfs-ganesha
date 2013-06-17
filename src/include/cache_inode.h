@@ -280,10 +280,11 @@ typedef struct cache_inode_dir_entry__
     uint64_t k; /*< Integer cookie */
     uint32_t p; /*< Number of probes, an efficiency metric */
   } hk;
-  gweakref_t entry; /*< Weak reference pointing to the cache entry */
+  gweakref_t entry_wkref; /*< Weak reference pointing to the cache entry */
   fsal_name_t name; /*< The filename */
   uint64_t fsal_cookie; /*< The cookie returned by the FSAL. */
   uint32_t flags; /*< Flags */
+  bool_t itr_present; /*True if present in the current readdir iteration .*/
 } cache_inode_dir_entry_t;
 
 /**
@@ -605,6 +606,7 @@ typedef bool_t(*cache_inode_readdir_cb_t)(
      void *opaque,
      char *name,
      cache_entry_t *entry,
+     bool_t attr_allowed,
      fsal_op_context_t *context,
      uint64_t cookie);
 

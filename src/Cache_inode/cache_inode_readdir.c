@@ -86,9 +86,6 @@ cache_inode_invalidate_all_cached_dirent(cache_entry_t *entry,
           return *status;
      }
 
-     /* Get ride of entries cached in the DIRECTORY */
-     cache_inode_release_dirents(entry, CACHE_INODE_AVL_BOTH);
-
      /* Mark directory as not populated */
      atomic_clear_uint32_t_bits(&entry->flags, (CACHE_INODE_DIR_POPULATED |
                                                 CACHE_INODE_TRUST_CONTENT));
@@ -138,6 +135,13 @@ cache_inode_operate_cached_dirent(cache_entry_t *directory,
          status = CACHE_INODE_BAD_TYPE;
          goto out;
      }
+     LogFullDebug(COMPONENT_CACHE_INODE,
+                  "%s %p name=%s newname=%s",
+                  dirent_op == CACHE_INODE_DIRENT_OP_REMOVE ?
+                  "REMOVE" : "RENAME",
+                  directory,
+                  name->name,
+                  newname->name);
 
      /* If no active entry, do nothing */
      if (directory->object.dir.nbactive == 0) {
@@ -205,7 +209,7 @@ cache_inode_operate_cached_dirent(cache_entry_t *directory,
              dirent3 = pool_alloc(cache_inode_dir_entry_pool, NULL);
              FSAL_namecpy(&dirent3->name, newname);
              dirent3->flags = DIR_ENTRY_FLAG_NONE;
-             dirent3->entry = dirent->entry;
+             dirent3->entry_wkref = dirent->entry_wkref;
              code = cache_inode_avl_qp_insert(directory, dirent3);
              switch (code) {
              case 0:
@@ -294,7 +298,10 @@ cache_inode_add_cached_dirent(cache_entry_t *parent,
      new_dir_entry->flags = DIR_ENTRY_FLAG_NONE;
 
      FSAL_namecpy(&new_dir_entry->name, name);
-     new_dir_entry->entry = entry->weakref;
+     if(entry)
+       new_dir_entry->entry_wkref = entry->weakref;
+
+     new_dir_entry->itr_present = FALSE;
 
      /* add to avl */
      code = cache_inode_avl_qp_insert(parent, new_dir_entry);
@@ -367,6 +374,42 @@ cache_inode_remove_cached_dirent(cache_entry_t *directory,
 
 } /* cache_inode_remove_cached_dirent */
 
+static
+void cache_inode_validate_all_cached_dirent(cache_entry_t *directory,
+                                            fsal_op_context_t *context)
+{
+  /* Used in verifying if any dirents should be removed. */
+  struct avltree_node *dirent_node = NULL;
+  struct avltree_node *next_dirent_node = NULL;
+  cache_inode_dir_entry_t *dirent = NULL;
+  struct avltree *tree;
+
+  tree = &directory->object.dir.avl.t;
+  if (!tree)
+    return; /* Nothing to do */
+
+  dirent_node = avltree_first(tree);
+  while( dirent_node )
+    {
+      next_dirent_node = avltree_next(dirent_node);
+      dirent = avltree_container_of(dirent_node,
+                                    cache_inode_dir_entry_t,
+                                    node_hk);
+      if(dirent->itr_present == FALSE)
+        {
+          /* quick removal of dirent to dir.avl.c */
+           LogFullDebug(COMPONENT_CACHE_INODE,
+                        "deleting: %s", dirent->name.name);
+          avl_dirent_set_deleted(directory, dirent);
+          directory->object.dir.nbactive--;
+        }
+      else
+        dirent->itr_present = FALSE;
+
+      dirent_node = next_dirent_node;
+    }
+}
+
 /**
  *
  * @brief Cache complete directory contents
@@ -394,17 +437,11 @@ cache_inode_readdir_populate(cache_entry_t *directory,
   uint32_t iter = 0;
   fsal_boolean_t eod = FALSE;
 
-  cache_entry_t *entry = NULL;
-  fsal_attrib_list_t object_attributes;
-
-  cache_inode_create_arg_t create_arg = {
-       .newly_created_dir = FALSE
-  };
-  cache_inode_file_type_t type = UNASSIGNED;
   cache_inode_status_t cache_status = CACHE_INODE_SUCCESS;
   fsal_dirent_t array_dirent[FSAL_READDIR_SIZE + 20];
-  cache_inode_fsal_data_t new_entry_fsdata;
-  cache_inode_dir_entry_t *new_dir_entry = NULL;
+  cache_inode_dir_entry_t *dirent = NULL;
+  cache_inode_dir_entry_t dirent_key;
+
   uint64_t i = 0;
 
   /* Set the return default to CACHE_INODE_SUCCESS */
@@ -423,11 +460,6 @@ cache_inode_readdir_populate(cache_entry_t *directory,
       *status = CACHE_INODE_SUCCESS;
       return *status;
     }
-
-  /* Invalidate all the dirents */
-  if(cache_inode_invalidate_all_cached_dirent(directory,
-                                              status) != CACHE_INODE_SUCCESS)
-    return *status;
 
   /* Open the directory */
   fsal_status = FSAL_opendir(&directory->handle, context, &dir_handle, NULL);
@@ -480,65 +512,23 @@ cache_inode_readdir_populate(cache_entry_t *directory,
               continue;
             }
 
-          /* If dir entry is a symbolic link, its content has to be read */
-          if((type =
-              cache_inode_fsal_type_convert(array_dirent[iter]
-                                            .attributes.type))
-             == SYMBOLIC_LINK)
+          memset(&dirent_key, 0, sizeof(dirent_key));
+          FSAL_namecpy(&dirent_key.name, &(array_dirent[iter].name));
+          dirent = cache_inode_avl_qp_lookup_s(directory, &dirent_key, 1);
+          if(!dirent)
             {
-              /* Let's read the link for caching its value */
-              object_attributes.asked_attributes = cache_inode_params.attrmask;
-              fsal_status
-                = FSAL_readlink(&array_dirent[iter].handle,
-                                context,
-                                &create_arg.link_content, &object_attributes);
+              /* Missing from AVL tree add it. */
+              cache_status = cache_inode_add_cached_dirent(directory,
+                                          &(array_dirent[iter].name),
+                                          (cache_entry_t *)NULL,
+                                          &dirent,
+                                          status);
 
-              if(FSAL_IS_ERROR(fsal_status))
-                {
-                     *status = cache_inode_error_convert(fsal_status);
-                     if (fsal_status.major == ERR_FSAL_STALE) {
-                          LogEvent(COMPONENT_CACHE_INODE,
-                                "FSAL returned STALE from readlink");
-                          cache_inode_kill_entry(directory);
-                     }
-                     goto bail;
-                }
+              if(cache_status != CACHE_INODE_SUCCESS
+                 && cache_status != CACHE_INODE_ENTRY_EXISTS)
+                goto bail;
             }
-          else
-            {
-              create_arg.newly_created_dir = FALSE;
-            }
-
-          /* Try adding the entry, if it exists then this existing entry is
-             returned */
-          new_entry_fsdata.fh_desc.start
-            = (caddr_t)(&array_dirent[iter].handle);
-          new_entry_fsdata.fh_desc.len = 0;
-          FSAL_ExpandHandle(context->export_context,
-                            FSAL_DIGEST_SIZEOF,
-                            &new_entry_fsdata.fh_desc);
-
-          if((entry
-              = cache_inode_new_entry(&new_entry_fsdata,
-                                      &array_dirent[iter].attributes,
-                                      type,
-                                      &create_arg,
-                                      status)) == NULL)
-            goto bail;
-          cache_status
-            = cache_inode_add_cached_dirent(directory,
-                                            &(array_dirent[iter].name),
-                                            entry,
-                                            &new_dir_entry,
-                                            status);
-
-          /* Once the weakref is stored in the directory entry, we
-             can release the reference we took on the entry. */
-          cache_inode_lru_unref(entry, 0);
-
-          if(cache_status != CACHE_INODE_SUCCESS
-             && cache_status != CACHE_INODE_ENTRY_EXISTS)
-            goto bail;
+          dirent->itr_present = TRUE;
 
           /*
            * Remember the FSAL readdir cookie associated with this
@@ -553,7 +543,7 @@ cache_inode_readdir_populate(cache_entry_t *directory,
           if (cache_status != CACHE_INODE_ENTRY_EXISTS)
               FSAL_cookie_to_uint64(&array_dirent[iter].handle,
                                     context, &array_dirent[iter].cookie,
-                                    &new_dir_entry->fsal_cookie);
+                                    &(dirent->fsal_cookie));
         } /* iter */
 
       /* Get prepared for next step */
@@ -576,6 +566,8 @@ cache_inode_readdir_populate(cache_entry_t *directory,
   atomic_set_uint32_t_bits(&directory->flags,
                            (CACHE_INODE_DIR_POPULATED |
                             CACHE_INODE_TRUST_CONTENT));
+  /* for name cache and cookie cache validate all entries*/
+  cache_inode_validate_all_cached_dirent(directory, context);
   *status = CACHE_INODE_SUCCESS;
   return *status;
 
@@ -583,7 +575,6 @@ bail:
   /* Close the directory */
   FSAL_closedir(&dir_handle, context);
   return *status;
-
 }                               /* cache_inode_readdir_populate */
 
 /**
@@ -767,7 +758,7 @@ cache_inode_readdir(cache_entry_t *directory,
                                         cache_inode_dir_entry_t,
                                         node_hk);
 
-          entry = cache_inode_weakref_get(&dirent->entry,
+          entry = cache_inode_weakref_get(&dirent->entry_wkref,
                                           LRU_REQ_SCAN);
 
           if(entry == NULL) {
@@ -795,6 +786,9 @@ cache_inode_readdir(cache_entry_t *directory,
                          *status = lookup_status;
                          goto unlock_dir;
                     }
+               } else {
+                    /* Add the ref to dirent */
+                    dirent->entry_wkref = entry->weakref;
                }
           }
 
@@ -839,12 +833,17 @@ cache_inode_readdir(cache_entry_t *directory,
                     in_result = cb(cb_opaque,
                                    dirent->name.name,
                                    entry,
+                                   TRUE,
                                    context,
                                    dirent->hk.k);
           } else {
+                    /* Even though permission is denied, we pass the
+                     * cache_entry_t so v3 READDIR can return the fileid
+                     */
                     in_result = cb(cb_opaque,
                                    dirent->name.name,
-                                   NULL,
+                                   entry,
+                                   FALSE,
                                    context,
                                    dirent->hk.k);
           }
