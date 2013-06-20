@@ -1,0 +1,8 @@
+#!/bin/bash
+cd src
+./tirpc.sh && ./autogen.sh
+cd libtirpc
+./bootstrap && ./configure && make
+cd ..
+./configure --with-fsal=POSIX --with-db=PGSQL --enable-nlm
+make
