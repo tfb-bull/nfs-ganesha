@@ -104,12 +104,20 @@ int nfs4_op_close(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
                           data->current_entry,
                           &pstate_found,
                           data,
-                          STATEID_SPECIAL_FOR_LOCK,
+                          STATEID_SPECIAL_FOR_CLOSE_40,
                           0,
                           FALSE,                  /* do not check owner seqid */
                           tag);
 
-  if(rc == NFS4ERR_BAD_STATEID)
+  if(rc != NFS4_OK)
+    {
+      res_CLOSE4.status = rc;
+      LogDebug(COMPONENT_STATE,
+               "CLOSE failed nfs4_Check_Stateid");
+      return res_CLOSE4.status;
+    }
+
+  if(pstate_found == NULL)
     {
       /* Assume this is a replayed close */
       res_CLOSE4.status = NFS4_OK;
@@ -120,15 +128,7 @@ int nfs4_op_close(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
       if(res_CLOSE4.CLOSE4res_u.open_stateid.seqid == 0)
         res_CLOSE4.CLOSE4res_u.open_stateid.seqid = 1;
       LogDebug(COMPONENT_STATE,
-               "CLOSE failed nfs4_Check_Stateid with NFS4ERR_BAD_STATEID");
-      return res_CLOSE4.status;
-    }
-
-  if(rc != NFS4_OK)
-    {
-      res_CLOSE4.status = rc;
-      LogDebug(COMPONENT_STATE,
-               "CLOSE failed nfs4_Check_Stateid");
+               "CLOSE failed nfs4_Check_Stateid must have already been closed");
       return res_CLOSE4.status;
     }
 
@@ -137,7 +137,11 @@ int nfs4_op_close(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
   P(popen_owner->so_mutex);
 
   /* Check seqid */
-  if(!Check_nfs4_seqid(popen_owner, arg_CLOSE4.seqid, op, data, resp, tag))
+  if(!Check_nfs4_seqid(popen_owner,
+                       arg_CLOSE4.seqid,
+                       op, data->current_entry,
+                       resp,
+                       tag))
     {
       /* Response is all setup for us and LogDebug told what was wrong */
       V(popen_owner->so_mutex);
@@ -165,7 +169,12 @@ int nfs4_op_close(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
                    "NFS4 Close with existing locks");
 
           /* Save the response in the open owner */
-          Copy_nfs4_state_req(popen_owner, arg_CLOSE4.seqid, op, data, resp, tag);
+          Copy_nfs4_state_req(popen_owner,
+                              arg_CLOSE4.seqid,
+                              op,
+                              data->current_entry,
+                              resp,
+                              tag);
 
           dec_state_owner_ref(popen_owner);
 
@@ -181,7 +190,12 @@ int nfs4_op_close(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
                  tag);
 
   /* Save the response in the open owner */
-  Copy_nfs4_state_req(popen_owner, arg_CLOSE4.seqid, op, data, resp, tag);
+  Copy_nfs4_state_req(popen_owner,
+                      arg_CLOSE4.seqid,
+                      op,
+                      data->current_entry,
+                      resp,
+                      tag);
 
   /* File is closed, release the corresponding lock states */
   glist_for_each_safe(glist, glistn, &pstate_found->state_data.share.share_lockstates)
@@ -235,7 +249,12 @@ int nfs4_op_close(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
       PTHREAD_RWLOCK_UNLOCK(&data->current_entry->state_lock);
 
       /* Save the response in the open owner */
-      Copy_nfs4_state_req(popen_owner, arg_CLOSE4.seqid, op, data, resp, tag);
+      Copy_nfs4_state_req(popen_owner,
+                          arg_CLOSE4.seqid,
+                          op,
+                          data->current_entry,
+                          resp,
+                          tag);
 
       dec_state_owner_ref(popen_owner);
 
