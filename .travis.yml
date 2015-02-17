@@ -9,7 +9,6 @@ env:
 
 branches:
  only:
-  - travis
   - next
 
 before_install:
@@ -31,17 +30,8 @@ script: mkdir ../build && cd ../build && cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -D
 notifications:
   email:
     recepients:
-      - sbhamare@panasas.com
+      - thomas.favre-bulle@bull.net
 
     on_success: always
     on_failure: always
-
-  irc:
-    channels:
-      - "irc.panasas.com#pnfs"
-    template:
-      - "%{repository}#%{build_number}  (%{branch} - %{commit}) : %{message}"
-      - "Build details: %{build_url}"
-    use_notice: true
-    skip_join: true
 
