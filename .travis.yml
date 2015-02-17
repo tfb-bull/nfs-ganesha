@@ -33,7 +33,9 @@ before_install:
  - wget -q -O- 'https://ceph.com/git/?p=ceph.git;a=blob_plain;f=keys/release.asc' | sudo apt-key add -
  - echo deb http://eu.ceph.com/debian-dumpling/ $(lsb_release -sc) main | sudo tee /etc/apt/sources.list.d/ceph.list
  - sudo apt-get update -q
- - sudo apt-get -y install ceph
+ - sudo apt-get install -y ceph
+ - sudo apt-get install -y liblttng-ust0
+ - sudo apt-get install -y python-qt4
 
 script: mkdir ../build && cd ../build && cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_CONFIG=everything -DUSE_FSAL_GLUSTER=OFF -DUSE_ADMIN_TOOLS=ON -DUSE_LTTNG=ON ../nfs-ganesha/src/ && make
 
