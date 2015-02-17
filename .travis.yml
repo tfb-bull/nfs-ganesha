@@ -27,6 +27,7 @@ before_install:
  - sudo add-apt-repository ppa:semiosis/ubuntu-glusterfs-3.5 -y
  - sudo apt-get update -q
  - sudo apt-get install -y glusterfs-server
+ - sudo apt-get install -y xfsprogs
 
 script: mkdir ../build && cd ../build && cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_CONFIG=everything ../nfs-ganesha/src/ && make
 
