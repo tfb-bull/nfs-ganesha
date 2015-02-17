@@ -24,7 +24,7 @@ before_install:
  - sudo apt-get install dbus
  - sudo apt-get install libdbus-1-dev
  - sudo apt-get install libcap-dev
- - sudo apt-get install -y jemalloc
+ - sudo apt-get install -y libjemalloc-dev
  - sudo add-apt-repository ppa:semiosis/ubuntu-glusterfs-3.5 -y
  - sudo apt-get update -q
  - sudo apt-get install -y glusterfs-server
