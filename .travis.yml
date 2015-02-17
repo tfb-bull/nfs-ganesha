@@ -4,7 +4,7 @@ compiler:
   - gcc
 
 env:
-  - BUILD_TYPE=Debug
+#  - BUILD_TYPE=Debug
   - BUILD_TYPE=Release
 
 branches:
@@ -35,7 +35,7 @@ before_install:
  - sudo apt-get update -q
  - sudo apt-get -y install ceph
 
-script: mkdir ../build && cd ../build && cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_CONFIG=everything ../nfs-ganesha/src/ && make
+script: mkdir ../build && cd ../build && cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_CONFIG=everything -DUSE_FSAL_GLUSTER=OFF -DUSE_ADMIN_TOOLS=ON -DUSE_LTTNG=ON ../nfs-ganesha/src/ && make
 
 notifications:
   email:
