@@ -9,7 +9,7 @@ env:
 
 branches:
  only:
-  - next
+  - Travis_integration
 
 before_install:
  - git submodule update --init --recursive
