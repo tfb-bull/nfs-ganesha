@@ -45,9 +45,10 @@ before_install:
  - sudo apt-get install -y rpm2cpio
  - wget https://downloads.hpdd.intel.com/public/lustre/latest-maintenance-release/el6/server/RPMS/x86_64/lustre-2.5.3-2.6.32_431.23.3.el6_lustre.x86_64.x86_64.rpm -O /tmp/lustre.rpm
  - mkdir /tmp/lustre && pushd /tmp/lustre ; rpm2cpio /tmp/lustre.rpm | cpio -id ./usr/include/\* ./usr/lib64/liblustreapi.a ; popd
- - cd nfs-ganesha/contrib/libzfswrap && aclocal -I m4 && libtoolize --force --copy && autoconf && autoheader && automake -a --add-missing -Wall && ./configure && make && make install
 
-script: mkdir ../build && cd ../build && cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_CONFIG=everything -DUSE_FSAL_PT=ON -DUSE_FSAL_GLUSTER=OFF -DUSE_FSAL_CEPH=OFF -DUSE_ADMIN_TOOLS=ON -DUSE_LTTNG=ON -DUSE_TIRPC_IPV6=ON -DLUSTRE_PREFIX=/tmp/lustre/usr ../nfs-ganesha/src/ && make
+script:
+# - cd nfs-ganesha/contrib/libzfswrap && aclocal -I m4 && libtoolize --force --copy && autoconf && autoheader && automake -a --add-missing -Wall && ./configure && make && make install
+ - mkdir ../build && cd ../build && cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_CONFIG=everything -DUSE_FSAL_PT=ON -DUSE_FSAL_GLUSTER=ON -DUSE_FSAL_CEPH=OFF -DUSE_ADMIN_TOOLS=ON -DUSE_LTTNG=ON -DUSE_TIRPC_IPV6=ON -DLUSTRE_PREFIX=/tmp/lustre/usr ../nfs-ganesha/src/ && make
 
 notifications:
   email:
