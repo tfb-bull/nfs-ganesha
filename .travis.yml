@@ -23,6 +23,7 @@ before_install:
  - sudo apt-get install libgssglue1
  - sudo apt-get install libdbus-1-3
  - sudo apt-get install -y libattr1-dev
+ - sudo apt-get install -y libacl1-dev
  - sudo apt-get install dbus
  - sudo apt-get install libdbus-1-dev
  - sudo apt-get install libcap-dev
