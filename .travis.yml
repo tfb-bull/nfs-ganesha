@@ -21,6 +21,7 @@ before_install:
  - sudo apt-get install libgssapi-krb5-2
  - sudo apt-get install libgssglue1
  - sudo apt-get install libdbus-1-3
+ - sudo apt-get install -y libattr1-dev
  - sudo apt-get install dbus
  - sudo apt-get install libdbus-1-dev
  - sudo apt-get install libcap-dev
@@ -28,14 +29,19 @@ before_install:
  - sudo add-apt-repository ppa:semiosis/ubuntu-glusterfs-3.5 -y
  - sudo apt-get update -q
  - sudo apt-get install -y glusterfs-server
+ - sudo apt-get install -y libglusterfs-dev
  - sudo apt-get install -y uuid-dev
+ - sudo apt-get install -y libblkid-dev
  - sudo apt-get install -y xfslibs-dev
  - wget -q -O- 'https://ceph.com/git/?p=ceph.git;a=blob_plain;f=keys/release.asc' | sudo apt-key add -
  - echo deb http://eu.ceph.com/debian-dumpling/ $(lsb_release -sc) main | sudo tee /etc/apt/sources.list.d/ceph.list
  - sudo apt-get update -q
  - sudo apt-get install -y ceph
+ - sudo apt-get install -y libcephfs-dev
  - sudo apt-get install -y liblttng-ust0
+ - sudo apt-get install -y liblttng-ust-dev
  - sudo apt-get install -y python-qt4
+ - sudo apt-get install -y pyqt4-dev-tools
 
 script: mkdir ../build && cd ../build && cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_CONFIG=everything -DUSE_FSAL_GLUSTER=OFF -DUSE_ADMIN_TOOLS=ON -DUSE_LTTNG=ON ../nfs-ganesha/src/ && make
 
