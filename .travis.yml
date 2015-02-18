@@ -42,7 +42,7 @@ before_install:
  - sudo apt-get install -y python-qt4
  - sudo apt-get install -y pyqt4-dev-tools
 
-script: mkdir ../build && cd ../build && cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_CONFIG=everything -DUSE_FSAL_CEPH=OFF -DUSE_ADMIN_TOOLS=ON -DUSE_LTTNG=ON ../nfs-ganesha/src/ && make
+script: mkdir ../build && cd ../build && cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_CONFIG=everything DUSE_FSAL_GLUSTER=OFF -DUSE_FSAL_CEPH=OFF -DUSE_ADMIN_TOOLS=ON -DUSE_LTTNG=ON ../nfs-ganesha/src/ && make
 
 notifications:
   email:
