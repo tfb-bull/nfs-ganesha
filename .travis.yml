@@ -30,7 +30,6 @@ before_install:
  - sudo apt-get install -y libjemalloc-dev
  - sudo add-apt-repository ppa:semiosis/ubuntu-glusterfs-3.5 -y
  - sudo apt-get update -q
- - sudo apt-get install -y glusterfs-server
  - sudo apt-get install -y glusterfs-common
  - sudo apt-get install -y uuid-dev
  - sudo apt-get install -y libblkid-dev
@@ -40,15 +39,14 @@ before_install:
  - sudo apt-get update -q
  - sudo apt-get install -y libcephfs-dev
  - sudo apt-get install -y samba4-dev
- - sudo apt-get install -y liblttng-ust0
+ - sudo apt-get install -y lttng-tools
  - sudo apt-get install -y liblttng-ust-dev
- - sudo apt-get install -y python-qt4
  - sudo apt-get install -y pyqt4-dev-tools
  - sudo apt-get install -y rpm2cpio
  - wget https://downloads.hpdd.intel.com/public/lustre/latest-maintenance-release/el6/server/RPMS/x86_64/lustre-2.5.3-2.6.32_431.23.3.el6_lustre.x86_64.x86_64.rpm -O /tmp/lustre.rpm
  - mkdir /tmp/lustre && pushd /tmp/lustre ; rpm2cpio /tmp/lustre.rpm | cpio -id ./usr/include/\* ./usr/lib64/liblustreapi.a ; popd
 
-script: mkdir ../build && cd ../build && cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_CONFIG=everything -DUSE_FSAL_GLUSTER=OFF -DUSE_FSAL_CEPH=OFF -DUSE_ADMIN_TOOLS=ON -DUSE_LTTNG=ON -DUSE_TIRPC_IPV6=ON -DUSE_FSAL_PT=ON -DLUSTRE_PREFIX=/tmp/lustre/usr ../nfs-ganesha/src/ && make
+script: mkdir ../build && cd ../build && cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DBUILD_CONFIG=everything -DUSE_FSAL_GLUSTER=OFF -DUSE_FSAL_CEPH=OFF -DUSE_ADMIN_TOOLS=ON -DUSE_LTTNG=ON -DUSE_TIRPC_IPV6=ON -DLUSTRE_PREFIX=/tmp/lustre/usr ../nfs-ganesha/src/ && make
 
 notifications:
   email:
