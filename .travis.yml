@@ -1,16 +1,17 @@
 language: c
 
 compiler:
-  - gcc
+ - gcc
+ - clang
 
 env:
-  - BUILD_TYPE=Maintainer
-  - BUILD_TYPE=Debug
-  - BUILD_TYPE=Release
+ - BUILD_TYPE=Maintainer
+ - BUILD_TYPE=Debug
+ - BUILD_TYPE=Release
 
 branches:
  only:
-  - Travis_integration
+ - Travis_integration
 
 before_install:
  - git submodule update --init --recursive
@@ -60,7 +61,7 @@ script:
 notifications:
   email:
     recepients:
-      - thomas.favre-bulle@bull.net
+     - thomas.favre-bulle@bull.net
 
     on_success: always
     on_failure: always
