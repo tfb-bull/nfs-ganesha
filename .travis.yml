@@ -49,7 +49,7 @@ before_install:
  - wget https://downloads.hpdd.intel.com/public/lustre/latest-maintenance-release/el6/server/RPMS/x86_64/lustre-2.5.3-2.6.32_431.23.3.el6_lustre.x86_64.x86_64.rpm -O /tmp/lustre.rpm
  - mkdir /tmp/lustre && pushd /tmp/lustre ; rpm2cpio /tmp/lustre.rpm | cpio -id ./usr/include/\* ./usr/lib64/liblustreapi.a ; popd
  - wget https://github.com/tfb-bull/mooshika/archive/0.7.1.tar.gz -O /tmp/mooshika.tar.gz
- - mkdir /tmp/mooshika && tar xf /tmp/mooshika.tar.gz -C /tmp && cd /tmp/mooshika-0.7.1 && sh autogen.sh && ./configure --prefix=/tmp/mooshika && make && make install
+ - mkdir /tmp/mooshika && tar xf /tmp/mooshika.tar.gz -C /tmp && cd /tmp/mooshika-0.7.1 && sh autogen.sh && ./configure --prefix=/tmp/mooshika && make && make install && cd -
 
 script:
  - cd contrib/libzfswrap && aclocal -I m4 && libtoolize --force --copy && autoconf && autoheader && automake -a --add-missing -Wall && ./configure --prefix=/tmp/libzfswrap && make && make install && cd ../..
