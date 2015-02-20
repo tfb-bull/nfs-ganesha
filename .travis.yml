@@ -39,7 +39,7 @@ before_install:
  - echo deb http://eu.ceph.com/debian-dumpling/ $(lsb_release -sc) main | sudo tee /etc/apt/sources.list.d/ceph.list
  - sudo apt-get update -q
  - sudo apt-get install -y libcephfs-dev
- - sudo apt-get install -y samba4-dev
+ - sudo apt-get install -y libwbclient-dev
  - sudo apt-get install -y lttng-tools
  - sudo apt-get install -y liblttng-ust-dev
  - sudo apt-get install -y pyqt4-dev-tools
