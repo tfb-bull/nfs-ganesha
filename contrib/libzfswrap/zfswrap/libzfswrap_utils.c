@@ -13,6 +13,7 @@
 #include <sys/fcntl.h>
 
 #include <limits.h>
+#include <string.h>
 
 #include "libzfswrap_utils.h"
 
