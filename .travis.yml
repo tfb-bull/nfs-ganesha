@@ -36,7 +36,7 @@ before_install:
  - sudo apt-get install -y libblkid-dev
  - sudo apt-get install -y xfslibs-dev
  - wget -q -O- 'https://ceph.com/git/?p=ceph.git;a=blob_plain;f=keys/release.asc' | sudo apt-key add -
- - echo deb http://eu.ceph.com/debian-dumpling/ $(lsb_release -sc) main | sudo tee /etc/apt/sources.list.d/ceph.list
+ - echo deb http://eu.ceph.com/debian-firefly/ $(lsb_release -sc) main | sudo tee /etc/apt/sources.list.d/ceph.list
  - sudo apt-get update -q
  - sudo apt-get install -y libcephfs-dev
  - sudo apt-get install -y libwbclient-dev
