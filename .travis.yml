@@ -40,8 +40,11 @@ before_install:
  - sudo apt-get update -q
  - sudo apt-get install -y libcephfs-dev
  - sudo apt-get install -y libwbclient-dev
+ - sudo apt-add-repository -y ppa:lttng/ppa
+ - sudo apt-get update -q
  - sudo apt-get install -y lttng-tools
  - sudo apt-get install -y liblttng-ust-dev
+ - sudo apt-get install -y lttng-modules-dkms
  - sudo apt-get install -y pyqt4-dev-tools
  - sudo apt-get install -y rpm2cpio
  - sudo apt-get install -y libaio-dev
