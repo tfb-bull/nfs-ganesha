@@ -40,7 +40,6 @@ before_install:
  - sudo apt-get update -q
  - sudo apt-get install -y libcephfs-dev
  - sudo apt-get install -y libwbclient-dev
- - sudo apt-get install -y winbind4
  - sudo apt-get install -y lttng-tools
  - sudo apt-get install -y liblttng-ust-dev
  - sudo apt-get install -y pyqt4-dev-tools
