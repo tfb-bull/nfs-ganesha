@@ -1,3 +1,4 @@
+[![Build Status](https://travis-ci.org/tfb-bull/nfs-ganesha.svg?branch=Travis_integration)](https://travis-ci.org/tfb-bull/nfs-ganesha)
 nfs-ganesha
 ===========
 
