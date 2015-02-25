@@ -13,6 +13,13 @@ branches:
  only:
  - Travis_integration
 
+matrix:
+ exlude:
+  - compiler: clang
+    env: BUILD_TYPE=Maintainer
+  - compiler: clang
+    env: BUILD_TYPE=Debug
+
 before_install:
  - git submodule update --init --recursive
  - sudo add-apt-repository -y ppa:gluster/glusterfs-3.6
