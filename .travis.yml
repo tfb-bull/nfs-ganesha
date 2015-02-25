@@ -14,7 +14,7 @@ branches:
  - Travis_integration
 
 matrix:
- exlude:
+ exclude:
   - compiler: clang
     env: BUILD_TYPE=Maintainer
   - compiler: clang
