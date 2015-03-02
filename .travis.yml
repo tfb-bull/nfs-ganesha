@@ -11,7 +11,7 @@ env:
 
 branches:
  only:
- - next
+ - Travis_integration
 
 matrix:
  allow_failures:
